@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>H5Plot Studio — UW/Badlands h5 检视与 A4 绘图</title>
-<link rel="stylesheet" href="/static/style.css?v=20260821h">
+<link rel="stylesheet" href="/static/style.css?v=20260821i">
 </head>
 <body>
 
@@ -86,6 +86,12 @@
           </select>
         </label>
         <label class="chk"><input type="checkbox" id="cfg-panel-labels" checked> 自动 (a)(b) 面板标注</label>
+        <label>渲染引擎
+          <select id="cfg-engine">
+            <option value="matplotlib">matplotlib（质量）</option>
+            <option value="rust">Rust plotkit（极速）</option>
+          </select>
+        </label>
       </div>
 
       <div class="cfg-section">
@@ -152,6 +158,6 @@
 
 <div id="toast"></div>
 
-<script src="/static/app.js?v=20260821h"></script>
+<script src="/static/app.js?v=20260821i"></script>
 </body>
 </html>

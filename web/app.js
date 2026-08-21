@@ -1262,6 +1262,7 @@ function collectSpec() {
     style,
     layout: collectLayout(),
     auto_panel_labels: $("#cfg-panel-labels").checked,
+    engine: ($("#cfg-engine") || {}).value || "matplotlib",
     panels,
   };
 }
@@ -1404,6 +1405,8 @@ function applyConfigToUI(cfg) {
   $("#cfg-linewidth").value = st.line_width ?? 0.75;
   $("#cfg-tick-dir").value = st.tick_direction || "in";
   $("#cfg-orientation").value = cfg.orientation || "portrait";
+  const eng = document.getElementById("cfg-engine");
+  if (eng && cfg.engine) eng.value = cfg.engine;
   if (st.svg_fonttype === "none") $("#cfg-svgtext").checked = true;
   if (cfg.auto_panel_labels === false) $("#cfg-panel-labels").checked = false;
 }
@@ -1415,6 +1418,7 @@ function saveConfigSilent() {
     style: spec.style,
     layout: spec.layout,
     auto_panel_labels: spec.auto_panel_labels,
+    engine: spec.engine,
   } }).catch(() => {});
 }
 

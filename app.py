@@ -127,13 +127,22 @@ class PlotReq(BaseModel):
     orientation: str = "portrait"
     style: dict = {}
     panels: list[dict]
+    engine: str = "matplotlib"   # matplotlib | rust (plotkit sidecar)
 
 
 @app.post("/api/plot")
 def make_plot(req: PlotReq):
     try:
+        d = req.model_dump()
+        if d.get("engine") == "rust":
+            from core import rust_engine
+            if (rust_engine.rust_available() and len(d.get("panels") or []) == 1
+                    and (d["panels"][0].get("kind") == "material")):
+                import secrets as _s
+                return rust_engine.render_material_rust(d["panels"][0], _s.token_hex(6),
+                                                        dpi=int(d.get("style", {}).get("png_dpi", 300)))
         from core import plotters
-        meta = plotters.render_plot(req.model_dump())
+        meta = plotters.render_plot(d)
         return meta
     except Exception as e:  # noqa: BLE001
         raise HTTPException(500, f"绘图失败: {e}") from e

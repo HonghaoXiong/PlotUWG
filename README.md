@@ -33,6 +33,10 @@
 ### ⚡ Performance
 - Preview render 300dpi (sharp on large screens); SVG/PDF/PNG300 generated on demand
 - **Fast render mode**: particles → density-grid compositing (~0.2s vs 1.5s)
+- **Rust engine (plotkit)**: optional rendering backend built on the pure-Rust
+  [plotkit](https://github.com/anonymousAAK/plotrs) library (patched with a `quiver`
+  vector-field artist). Full 200k-point material figure at A4 300dpi in ~0.9s vs
+  ~2.2s matplotlib. Switch in Canvas settings: `Render engine = Rust plotkit`.
 - Render result cache (same spec → instant), subsampling disk cache
 - **Auto re-render** on parameter change (~650ms debounce)
 - Native macOS window (pywebview/WKWebView), starts in <1s

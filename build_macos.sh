@@ -30,6 +30,7 @@ pyinstaller --noconfirm --clean \
   --osx-bundle-identifier "com.h5touwg" \
   --icon "H5TOUWG.icns" \
   --add-data "web:web" \
+  --add-data "rust_bin/h5render:rust_bin" \
   --hidden-import app \
   --hidden-import uvicorn.logging \
   --hidden-import uvicorn.loops.auto \
