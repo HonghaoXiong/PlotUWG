@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>H5Plot Studio — UW/Badlands h5 检视与 A4 绘图</title>
+<link rel="stylesheet" href="/static/style.css?v=20260821h">
+</head>
+<body>
+
+<header>
+  <div class="brand"><span class="logo">H</span>H5Plot Studio</div>
+  <div class="sub">UNDERWORLD / BADLANDS · H5 INSPECT + A4 PLOT</div>
+  <div class="status"><span id="srv-status">--</span></div>
+  <button id="lang-toggle" class="lang-toggle" title="Language">EN</button>
+  <button id="cfg-toggle" class="cfg-toggle" title="绘图配置">⚙</button>
+</header>
+
+<main>
+  <!-- ================= 左：文件浏览器 ================= -->
+  <aside id="file-panel">
+    <div class="file-nav">
+      <input id="path-input" placeholder="输入目录路径…" spellcheck="false">
+      <button id="path-pick" title="选择文件夹/文件（原生对话框）">📂</button>
+      <button id="path-go" title="前往">Go</button>
+      <button id="path-home" title="家目录">⌂</button>
+      <button id="path-up" title="上一级">↑</button>
+    </div>
+    <div id="recent" class="recent"></div>
+    <div id="step-bar" class="step-bar hidden"></div>
+    <div id="dir-list" class="dir-list"></div>
+  </aside>
+
+  <!-- ================= 中栏（检视/画布）+ 右配置 ================= -->
+  <section id="content">
+
+    <div id="center">
+      <nav id="center-tabs">
+        <button id="tab-inspect" class="ctab active">▦ H5 检视</button>
+        <button id="tab-plot" class="ctab">◫ A4 画布</button>
+        <span id="center-hint" class="center-hint"></span>
+      </nav>
+      <div id="center-body">
+
+        <!-- 检视视图（紧凑：树 + 详情） -->
+        <div id="view-inspect" class="cview active">
+          <div id="h5-tree-wrap">
+            <div id="h5-meta" class="h5-meta"></div>
+            <div id="h5-tree" class="h5-tree"></div>
+          </div>
+          <div id="ds-detail" class="ds-detail">
+            <div class="placeholder">在左侧选择 .h5 / .hdf5 文件查看结构与内容<br>
+              <small>点击 dataset 可查看元信息、采样预览，并一键发送到绘图工坊</small>
+            </div>
+          </div>
+        </div>
+
+        <!-- 画布视图 -->
+        <div id="view-plot" class="cview">
+          <div id="plot-canvas-area">
+            <div class="placeholder">在检视器中点"发送到绘图"，或到右侧手动添加面板后点"渲染"<br>
+              <small>也可以在左侧选好时间步后点「＋ 物质场图 / 综合物质场图」</small>
+            </div>
+            <div id="plot-wrap" class="plot-wrap hidden">
+              <div id="plot-image-box">
+                <img id="plot-img" alt="渲染结果">
+                <div id="probe-tip"></div>
+              </div>
+              <div id="probe-readout" class="probe-readout"></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- 右侧配置（常驻） -->
+    <aside id="plot-config" class="plot-config">
+      <div class="cfg-head"><span>绘图配置</span><button id="cfg-close" class="cfg-close" title="关闭">✕</button></div>
+      <div class="cfg-section">
+        <h3>画板 (A4)</h3>
+        <label>方向
+          <select id="cfg-orientation">
+            <option value="portrait">A4 纵向 (210×297 mm)</option>
+            <option value="landscape">A4 横向 (297×210 mm)</option>
+          </select>
+        </label>
+        <label class="chk"><input type="checkbox" id="cfg-panel-labels" checked> 自动 (a)(b) 面板标注</label>
+      </div>
+
+      <div class="cfg-section">
+        <h3>排版 · 行列</h3>
+        <div class="grid2">
+          <label>行数 rows<input type="number" id="cfg-rows" value="" min="1" max="12" placeholder="自动"></label>
+          <label>列数 cols<input type="number" id="cfg-cols" value="" min="1" max="8" placeholder="自动"></label>
+        </div>
+        <small style="color:var(--muted)">留空=自动。想要物理等比（如 x 800km : y 160km → 5:1 横条）：在面板「横纵比」里选"数据等比"。</small>
+      </div>
+
+      <div class="cfg-section">
+        <h3>样式（期刊默认 = 你的习惯）</h3>
+        <div class="grid2">
+          <label>字体
+            <select id="cfg-font">
+              <option>Arial</option>
+              <option>Helvetica</option>
+              <option>DejaVu Sans</option>
+              <option>Arial Unicode MS</option>
+              <option>Times New Roman</option>
+            </select>
+          </label>
+          <label>正文字号 pt<input type="number" id="cfg-font-size" value="7" min="4" max="20" step="0.5"></label>
+          <label>坐标字号 pt<input type="number" id="cfg-label-size" value="8" min="4" max="20" step="0.5"></label>
+          <label>线宽 pt<input type="number" id="cfg-linewidth" value="0.75" min="0.1" max="5" step="0.05"></label>
+          <label>图例字号 pt<input type="number" id="cfg-legend-size" value="6.5" min="4" max="20" step="0.5"></label>
+          <label>tick 方向
+            <select id="cfg-tick-dir">
+              <option value="in" selected>朝内</option>
+              <option value="out">朝外</option>
+            </select>
+          </label>
+        </div>
+        <label class="chk"><input type="checkbox" id="cfg-svgtext" checked> SVG 可编辑文本 (svg.fonttype=none)</label>
+      </div>
+
+      <div class="cfg-section">
+        <h3>面板</h3>
+        <div id="panel-list"></div>
+        <div class="btn-row">
+          <button id="add-field" class="mini">+ 场图</button>
+          <button id="add-swarm" class="mini">+ 粒子图</button>
+          <button id="add-curve" class="mini">+ 曲线</button>
+        </div>
+      </div>
+
+      <div class="cfg-section">
+        <div class="btn-row">
+          <button id="render-btn" class="primary">◫ 渲染 (A4)</button>
+          <button id="export-btn" class="secondary">💾 导出 PNG+PDF+SVG</button>
+        </div>
+        <label id="export-dir-row" class="hidden">导出目录（留空 = 图片文件所在目录）
+          <input id="cfg-export-dir" placeholder="~/Documents/H5TOUWG_export">
+        </label>
+        <div id="plot-status" class="status-line"></div>
+      </div>
+    </aside>
+
+  </section>
+</main>
+
+<div id="cfg-mask"></div>
+
+<div id="toast"></div>
+
+<script src="/static/app.js?v=20260821h"></script>
+</body>
+</html>

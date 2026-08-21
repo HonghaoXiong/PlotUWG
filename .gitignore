@@ -1,0 +1,13 @@
+# 运行时数据（绝不入库）
+userdata/
+demo_output/
+
+# 构建产物
+build/
+dist/
+*.spec
+
+# Python
+__pycache__/
+*.pyc
+.DS_Store
