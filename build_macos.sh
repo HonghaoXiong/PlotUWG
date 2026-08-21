@@ -17,7 +17,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 APP_NAME="H5TOUWG"
-VERSION="0.2.0"
+VERSION="0.3.0"
 ARCH="$(python -c 'import platform; print(platform.machine())')"
 
 echo "==> 清理旧构建"

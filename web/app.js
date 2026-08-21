@@ -392,9 +392,23 @@ function renderStepBar(scan) {
   btnM.textContent = "＋ 多时间步四连图…";
   btnM.title = "输入多个 step，如 50,150,200,250；会按当前行列布局排版";
   btnM.onclick = () => addMaterialPanelsForSteps(dir, scan);
+  const btnS = document.createElement("button");
+  btnS.className = "sb-btn";
+  btnS.style.background = "linear-gradient(180deg,#8ab4f8,#4285f4)";
+  btnS.textContent = "＋ 界面线 (Topo/Moho/Sed)";
+  btnS.title = "Extract material interface lines (topography / sediment base / Moho)";
+  btnS.onclick = () => generateSurfacesPanel(parseInt(sel.value, 10), dir);
+  const btnSt = document.createElement("button");
+  btnSt.className = "sb-btn";
+  btnSt.style.background = "linear-gradient(180deg,#f28b82,#d93025)";
+  btnSt.textContent = "＋ 应力场 (σyy)";
+  btnSt.title = "Stress field on element centers (RdBu diverging)";
+  btnSt.onclick = () => generateStressPanel(parseInt(sel.value, 10), dir);
   row.appendChild(sel);
   row.appendChild(btn);
   row.appendChild(btnFull);
+  row.appendChild(btnS);
+  row.appendChild(btnSt);
   row.appendChild(btnM);
   bar.appendChild(title);
   bar.appendChild(row);
@@ -499,6 +513,38 @@ function generateFullMaterialPanel(step, dir, scan) {
   addPanel(panel);
   switchTab("plot");
   toast(`已添加综合物质场面板 step=${step}（${nOv} 个叠加：温度/应变/速度/追踪点）`);
+}
+
+function generateSurfacesPanel(step, dir) {
+  const d = dir.replace(/\/$/, "");
+  addPanel({
+    kind: "surfaces",
+    file: `${d}/swarm-${step}.h5`, dataset: "data",
+    material_file: `${d}/materialField-${step}.h5`,
+    n_segments: 100, legend: true,
+    xlabel: "x [km]", ylabel: "y [km]",
+    lines: [
+      { mat: 1, mode: "min", label: "Topography", color: "#1f77b4", lw: 1.6 },
+      { mat: 2, mode: "min", label: "Sed base", color: "#ff7f0e", lw: 1.4 },
+      { mat: 3, mode: "max", label: "Moho", color: "#d62728", lw: 1.6 },
+    ],
+  });
+  switchTab("plot");
+  toast(tr("已添加界面线面板（Topography / Sed base / Moho）", "Surfaces panel added (Topography / Sed base / Moho)"));
+}
+
+function generateStressPanel(step, dir) {
+  const d = dir.replace(/\/$/, "");
+  addPanel({
+    kind: "stress",
+    file: `${d}/projStressTensor-${step}.h5`, dataset: "data",
+    mesh_file: `${d}/mesh.h5`,
+    column: 1, cmap: "RdBu_r", vmin: -8, vmax: 8,
+    colorbar: true, cbar_label: "σyy [MPa]",
+    xlabel: "x [km]", ylabel: "y [km]",
+  });
+  switchTab("plot");
+  toast(tr("已添加应力场面板（σyy, RdBu）", "Stress panel added (σyy, RdBu)"));
 }
 
 function addMaterialPanelsForSteps(dir, scan) {
@@ -792,6 +838,10 @@ function renderPanels() {
     const posTag = ` · 位置(${Math.floor(i / Math.max(dims.cols, 1)) + 1},${(i % Math.max(dims.cols, 1)) + 1})`;
     let html = p.kind === "material"
       ? materialCardHTML(p, i)
+      : p.kind === "surfaces"
+      ? surfacesCardHTML(p, i)
+      : p.kind === "stress"
+      ? stressCardHTML(p, i)
       : `<h4><span class="tag">${tag}</span> 面板 ${i + 1}${posTag}
        <button class="panel-del" data-i="${i}" title="删除">✕</button></h4>`;
     if (p.kind === "material") {
@@ -983,6 +1033,31 @@ function renderPanels() {
       savePanels();
     };
   });
+  $$("#panel-list [data-act=srf-add]").forEach((btn) => {
+    btn.onclick = () => {
+      const p = state.panels[+btn.dataset.i];
+      p.lines = p.lines || [];
+      p.lines.push({ mat: 4, mode: "max", label: "interface", color: "#2ca02c", lw: 1.4 });
+      renderPanels(); savePanels();
+    };
+  });
+  $$("#panel-list [data-act=srf-del]").forEach((btn) => {
+    btn.onclick = () => {
+      const p = state.panels[+btn.dataset.i];
+      if (p && p.lines) { p.lines.splice(+btn.dataset.oi, 1); renderPanels(); savePanels(); }
+    };
+  });
+  $$("#panel-list [data-act=srf-field]").forEach((inp) => {
+    inp.addEventListener("change", (e) => {
+      const p = state.panels[+e.target.dataset.i];
+      if (!p || !p.lines) return;
+      const ln = p.lines[+e.target.dataset.oi];
+      if (!ln) return;
+      const k = e.target.dataset.srf;
+      ln[k] = k === "mat" ? parseInt(e.target.value, 10) : e.target.value;
+      savePanels(); scheduleAutoRender();
+    });
+  });
   $$("#panel-list [data-act=ov-del]").forEach((btn) => {
     btn.onclick = () => {
       const p = state.panels[+btn.dataset.i];
@@ -1019,6 +1094,58 @@ function renderPanels() {
       scheduleAutoRender();
     });
   });
+}
+
+function surfacesCardHTML(p, i) {
+  const dims = currentGridDims();
+  const posTag = `(位置 ${Math.floor(i / Math.max(dims.cols, 1)) + 1},${(i % Math.max(dims.cols, 1)) + 1})`;
+  let html = `<h4><span class="tag">界面线</span> 面板 ${i + 1} · ${posTag}
+     <button class="panel-del" data-i="${i}" title="删除">✕</button></h4>`;
+  html += `<label>swarm <small>${esc((p.file || "").split("/").pop())}</small></label>`;
+  html += `<label>分段数 <input type="number" data-f="n_segments" data-i="${i}" value="${p.n_segments ?? 100}"></label>`;
+  (p.lines || []).forEach((ln, li) => {
+    html += `<div class="ov-row">
+      <span class="ov-tag">line ${li + 1}</span>
+      <button class="ov-del" data-act="srf-del" data-i="${i}" data-oi="${li}" title="删除">✕</button>
+      <label>材料 id <input type="number" data-act="srf-field" data-srf="mat" data-i="${i}" data-oi="${li}" value="${ln.mat ?? 1}"></label>
+      <label>取 <select data-act="srf-field" data-srf="mode" data-i="${i}" data-oi="${li}">
+        <option value="min" ${ln.mode === "min" ? "selected" : ""}>顶面 (min y)</option>
+        <option value="max" ${ln.mode === "max" ? "selected" : ""}>底面 (max y)</option>
+      </select></label>
+      <label>标签 <input data-act="srf-field" data-srf="label" data-i="${i}" data-oi="${li}" value="${esc(ln.label || "")}"></label>
+      <label>颜色 <input type="color" data-act="srf-field" data-srf="color" data-i="${i}" data-oi="${li}" value="${(ln.color || "#1f77b4")}"></label>
+    </div>`;
+  });
+  html += `<div class="btn-row"><button class="mini" data-act="srf-add" data-i="${i}">+ 界面线</button></div>`;
+  html += `<label><input type="checkbox" data-f="legend" data-i="${i}" ${p.legend === false ? "" : "checked"}> 图例</label>`;
+  html += `<details><summary>坐标/标签</summary>
+    <label>x lim <input data-f="xlim" data-i="${i}" value="${(p.xlim || []).join(",")}" placeholder="0,800"></label>
+    <label>y lim <input data-f="ylim" data-i="${i}" value="${(p.ylim || []).join(",")}" placeholder="-150,10"></label>
+  </details>`;
+  return html;
+}
+
+function stressCardHTML(p, i) {
+  const dims = currentGridDims();
+  const posTag = `(位置 ${Math.floor(i / Math.max(dims.cols, 1)) + 1},${(i % Math.max(dims.cols, 1)) + 1})`;
+  let html = `<h4><span class="tag">应力场</span> 面板 ${i + 1} · ${posTag}
+     <button class="panel-del" data-i="${i}" title="删除">✕</button></h4>`;
+  html += `<label>分量 <select data-f="column" data-i="${i}">
+    <option value="0" ${p.column === 0 ? "selected" : ""}>σxx</option>
+    <option value="1" ${p.column === 1 || p.column == null ? "selected" : ""}>σyy</option>
+    <option value="2" ${p.column === 2 ? "selected" : ""}>σxy</option>
+  </select></label>`;
+  html += `<label>colormap <div class="cmap-row2"><select data-f="cmap" data-i="${i}">
+    ${["RdBu_r", "seismic", "coolwarm", "turbo", "viridis"].map(c => `<option value="${c}" ${(p.cmap || "RdBu_r") === c ? "selected" : ""}>${c}</option>`).join("")}
+  </select><span class="cmap-preview" id="cmap-prev-p-${i}"></span></div></label>`;
+  html += `<label>vmin <input type="number" step="any" data-f="vmin" data-i="${i}" value="${p.vmin ?? -8}"></label>`;
+  html += `<label>vmax <input type="number" step="any" data-f="vmax" data-i="${i}" value="${p.vmax ?? 8}"></label>`;
+  html += `<label>colorbar 标签 <input data-f="cbar_label" data-i="${i}" value="${esc(p.cbar_label || "Stress [MPa]")}"></label>`;
+  html += `<details><summary>坐标/标签</summary>
+    <label>x lim <input data-f="xlim" data-i="${i}" value="${(p.xlim || []).join(",")}" placeholder="0,800"></label>
+    <label>y lim <input data-f="ylim" data-i="${i}" value="${(p.ylim || []).join(",")}" placeholder="-150,20"></label>
+  </details>`;
+  return html;
 }
 
 function materialCardHTML(p, i) {

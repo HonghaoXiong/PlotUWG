@@ -13,6 +13,11 @@
 
 ### 📊 A4 plot studio
 - **Material field** base layer (swarm + materialField) with the **Qaidam palette** (Air / Sed / Lithospheric Mantle / Qaidam UC-MC-LC / Orogen UC-MC-LC, matched to the paper convention)
+- **Interface lines panel** (topography / sediment base / Moho): segment-extreme
+  extraction from material particles (same algorithm as the author's TopoField /
+  Moho scripts), multi-line with per-line material/mode/color
+- **Stress field panel**: σxx/σyy/σxy on element centers (projStressTensor + mesh
+  en_map), diverging RdBu colormap with symmetric vmin/vmax
 - **Overlays** (any combination, auto-detected when present):
   - Temperature contours (K, ℃ labels, label region picker)
   - Plastic strain threshold scatter (e.g. ≥1.5 & y<4)

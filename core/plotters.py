@@ -485,6 +485,11 @@ def draw_field(ax, panel: dict, style: dict) -> dict:
         X, Y, _ = _field_grid(verts, geo)
         if X.shape == vals.shape:
             Z = vals.reshape(X.shape)
+        elif vals.size == (X.shape[0] - 1) * (X.shape[1] - 1):
+            # 单元中心数据（如 projStressTensor）：从节点网格算单元中心
+            Xc = 0.5 * (X[:-1, :-1] + X[1:, 1:])
+            Yc = 0.5 * (Y[:-1, :-1] + Y[1:, 1:])
+            X, Y, Z = Xc, Yc, vals.reshape(Xc.shape)
         else:
             Z = vals.reshape(Y.shape)
     else:
@@ -613,6 +618,72 @@ def draw_swarm(ax, panel: dict, style: dict) -> dict:
     _apply_style(ax, style)
     _apply_aspect(ax, panel)
     return {"kind": "swarm", "n": n, "shown": len(x)}
+
+
+def _extract_surface(xy: np.ndarray, mat: np.ndarray, mat_id: int,
+                     mode: str, n_seg: int, x_min: float, x_max: float) -> tuple:
+    """分段极值提取材料界面线（用户 TopoField/Moho 脚本同款算法）。
+
+    mode='min' → 每段最小 y（如地形 = 空气底）；'max' → 每段最大 y（如莫霍面 = 地幔顶）。
+    """
+    mask = mat == int(mat_id)
+    pts = xy[mask]
+    if x_min is not None and x_max is not None:
+        pts = pts[(pts[:, 0] >= x_min) & (pts[:, 0] < x_max)]
+    if len(pts) == 0:
+        return np.array([]), np.array([])
+    edges = np.linspace(x_min, x_max, int(n_seg) + 1)
+    bin_idx = np.clip(np.digitize(pts[:, 0], edges) - 1, 0, int(n_seg) - 1)
+    xs, ys = [], []
+    for k in range(int(n_seg)):
+        seg = pts[bin_idx == k]
+        if seg.size == 0:
+            continue
+        xs.append(0.5 * (edges[k] + edges[k + 1]))
+        ys.append(seg[:, 1].min() if mode == "min" else seg[:, 1].max())
+    return np.array(xs), np.array(ys)
+
+
+def draw_surfaces(ax, panel: dict, style: dict) -> dict:
+    """材料界面线面板：地形/沉积底面/莫霍面等多线曲线（segment_extreme 算法）。"""
+    fn = panel["file"]
+    mfile = panel.get("material_file") or fn
+    xy, mat, _ = _subsample_with_cache(fn, mfile if mfile and Path(mfile).exists() else None)
+    if mat is None:
+        mat = np.ones(len(xy), dtype=int)
+    n_seg = int(panel.get("n_segments", 100))
+    x_min, x_max = panel.get("x_min"), panel.get("x_max")
+    if x_min is None or x_max is None:
+        x_min, x_max = float(xy[:, 0].min()), float(xy[:, 0].max())
+    default_colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b"]
+    lines = panel.get("lines") or [
+        {"mat": 1, "mode": "min", "label": "Topography"},
+        {"mat": 2, "mode": "min", "label": "Sed base"},
+        {"mat": 3, "mode": "max", "label": "Moho"},
+    ]
+    drawn = 0
+    for i, lc in enumerate(lines):
+        xs, ys = _extract_surface(xy, mat, lc.get("mat", 1), lc.get("mode", "min"),
+                                  n_seg, x_min, x_max)
+        if len(xs) == 0:
+            continue
+        ax.plot(xs, ys, color=lc.get("color", default_colors[i % len(default_colors)]),
+                lw=float(lc.get("lw", style.get("line_width", 1.2))),
+                ls=lc.get("ls", "-"), label=lc.get("label", f"mat {lc.get('mat')}"))
+        drawn += 1
+    if panel.get("legend", True) and drawn:
+        ax.legend(fontsize=style.get("legend_size", 6.5), frameon=False,
+                  handlelength=1.8, **_legend_kw(panel))
+    ax.set_xlabel(panel.get("xlabel", "x [km]"))
+    ax.set_ylabel(panel.get("ylabel", "y [km]"))
+    if panel.get("xlim"):
+        ax.set_xlim(*panel["xlim"])
+    if panel.get("ylim"):
+        ax.set_ylim(*panel["ylim"])
+    _apply_axes_common(ax, panel)
+    _apply_style(ax, style)
+    _apply_aspect(ax, panel)
+    return {"kind": "surfaces", "lines": drawn}
 
 
 def draw_curve(ax, panel: dict, style: dict) -> dict:
@@ -932,8 +1003,53 @@ def _sibling(fn: str, prefix: str) -> str | None:
 # --------------------------------------------------------------------------
 # 主渲染
 # --------------------------------------------------------------------------
+
+
+def draw_stress(ax, panel: dict, style: dict) -> dict:
+    """Stress field on element centers (projStressTensor + mesh en_map).
+
+    column: 0=sxx, 1=syy, 2=sxy. Diverging cmap (RdBu_r) + symmetric vmin/vmax by default.
+    """
+    fn = panel["file"]
+    mesh_file = panel.get("mesh_file") or _guess_mesh_file(fn)
+    if not mesh_file or not Path(mesh_file).exists():
+        raise ValueError("mesh.h5 required for element centers")
+    with h5py.File(fn, "r") as f:
+        data = f[panel.get("dataset", "data")][:].astype(float)
+    with h5py.File(mesh_file, "r") as f:
+        verts = f["vertices"][:]
+        en = f["en_map"][:].astype(np.int64)
+    centers = verts[en].mean(axis=1)
+    col = min(int(panel.get("column", 1)), data.shape[1] - 1)
+    vals = data[:, col]
+    vmin = panel.get("vmin")
+    vmax = panel.get("vmax")
+    if vmin is None and vmax is None:
+        v = float(np.nanpercentile(np.abs(vals), 95)) or 1.0
+        vmin, vmax = -v, v
+    sc = ax.scatter(centers[:, 0], centers[:, 1], c=vals,
+                    cmap=_resolve_cmap(panel, default="RdBu_r"),
+                    vmin=vmin, vmax=vmax, s=float(panel.get("marker_size", 1.5)),
+                    rasterized=True, antialiased=False)
+    if panel.get("colorbar", True):
+        cb = ax.figure.colorbar(sc, ax=ax, **(_colorbar_kw(panel) or dict(fraction=0.046, pad=0.04)))
+        cb.ax.tick_params(labelsize=style.get("tick_size", 7))
+        cb.set_label(panel.get("cbar_label", "Stress [MPa]"),
+                     fontsize=style.get("axes_label_size", 8))
+    ax.set_xlabel(panel.get("xlabel", "x [km]"))
+    ax.set_ylabel(panel.get("ylabel", "y [km]"))
+    if panel.get("xlim"):
+        ax.set_xlim(*panel["xlim"])
+    if panel.get("ylim"):
+        ax.set_ylim(*panel["ylim"])
+    _apply_axes_common(ax, panel)
+    _apply_style(ax, style)
+    _apply_aspect(ax, panel)
+    return {"kind": "stress", "n": len(vals)}
+
 DRAWS = {"field": draw_field, "swarm": draw_swarm, "curve": draw_curve,
-         "material": draw_material}
+         "material": draw_material, "surfaces": draw_surfaces,
+         "stress": draw_stress}
 
 
 def _layout(orientation: str, npanels: int, layout: dict | None = None) -> tuple[int, int, dict, list, list]:
