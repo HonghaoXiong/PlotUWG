@@ -386,63 +386,63 @@ def _cb_tight_bbox(fig, cbax):
     return bb.transformed(fig.transFigure.inverted()) if bb is not None else None
 
 
-def _fix_outside_right_legend(fig, ax) -> None:
-    """外右图例：与 colorbar（含刻度/标签）重叠时移到其右侧；放不下则回退外底。"""
+def _fix_outside_right_legend(fig, ax, cell=None) -> None:
+    """外右图例：只用自己单元内的右隙（colorbar 之后）；放不下回退外底（不侵入邻面板）。"""
     leg = ax.get_legend()
-    cbax = getattr(ax, "_h5_cb_ax", None)
-    if leg is None or cbax is None:
+    if leg is None:
         return
+    cell = cell or ax.get_position()
     fig.canvas.draw()
     r = fig.canvas.renderer
     inv = fig.transFigure.inverted()
     lb = leg.get_window_extent(r).transformed(inv)
-    cbb = _cb_tight_bbox(fig, cbax) or cbax.get_position()
-    overlap = lb.x1 > cbb.x0 and lb.x0 < cbb.x1 and lb.y1 > cbb.y0 and lb.y0 < cbb.y1
-    if not overlap:
-        return
     pos = ax.get_position()
-    new_x0 = cbb.x1 + 0.01
-    if new_x0 + lb.width <= 0.995:
-        leg.set_bbox_to_anchor(((new_x0 - pos.x0) / max(pos.width, 1e-6), 0.5))
+    x0_avail = pos.x1
+    cbax = getattr(ax, "_h5_cb_ax", None)
+    if cbax is not None:
+        cbb = _cb_tight_bbox(fig, cbax) or cbax.get_position()
+        if cbb.x0 >= pos.x1 - 0.001:   # colorbar 在右
+            x0_avail = cbb.x1
+    gap = 0.010
+    if x0_avail + gap + lb.width <= cell.x1 - 0.002:
+        leg.set_bbox_to_anchor(((x0_avail + gap - pos.x0) / max(pos.width, 1e-6), 0.5))
     else:
         handles, labels = ax.get_legend_handles_labels()
         leg.remove()
         if handles:
             ax.legend(handles, labels, **_legend_kw({"legend_loc": "outside bottom"}))
-            _fix_outside_bottom_legend(fig, ax)
+            _fix_outside_bottom_legend(fig, ax, cell)
 
 
-def _fix_outside_bottom_legend(fig, ax) -> None:
-    """外底图例排版：整体放到 xlabel+ticks 占位区之下，不遮挡 x 轴；
-    若超出页面底边则把 axes 上移腾出空间（probe 元信息在修正后记录）。"""
+def _fix_outside_bottom_legend(fig, ax, cell=None) -> None:
+    """外底图例：只在自己的网格单元内腾空间（axes 上移，底部留出
+    “x 轴占位 + 图例”条带；底部 colorbar 存在时条带在其上方）——不侵入相邻面板。"""
     leg = ax.get_legend()
     if leg is None:
         return
+    cell = cell or ax.get_position()
     fig.canvas.draw()
     r = fig.canvas.renderer
-    inv = fig.transFigure.inverted()
     pos = ax.get_position()
+    fig_h = fig.bbox.height
     xb = ax.xaxis.get_tightbbox(r)
-    # 图例顶边需低于 xlabel 底边（xb.y0 = 整个 x 轴占位区的下缘）
-    xzone_bottom = inv.transform((0, xb.y0))[1] if xb is not None else pos.y0 - 0.05
-    # 若底部还有 colorbar，图例也要在 colorbar 之上
+    hX = (xb.height / fig_h) if xb is not None else 0.05
+    hL = leg.get_window_extent(r).height / fig_h
+    gap = 0.010
+    bottom_limit = cell.y0
     cbax = getattr(ax, "_h5_cb_ax", None)
     if cbax is not None:
         cbb = _cb_tight_bbox(fig, cbax) or cbax.get_position()
         if cbb.y1 <= pos.y0 + 0.02:
-            xzone_bottom = min(xzone_bottom, cbb.y1)
-    lb = leg.get_window_extent(r).transformed(inv)
-    gap = 0.010
-    desired_top = xzone_bottom - gap
-    # loc='upper center' → 锚点=图例顶边中点；换算到 axes 坐标重锚
+            bottom_limit = max(bottom_limit, cbb.y1)
+    needed_y0 = bottom_limit + gap + hL + gap + hX
+    if pos.y0 < needed_y0:
+        ax.set_position([pos.x0, needed_y0, pos.width,
+                         max(pos.y1 - needed_y0, 0.05)])
+        pos = ax.get_position()
+    # 图例顶边锚到 x 轴占位区之下（占位区悬挂于新 axes 底边下方 hX）
+    desired_top = pos.y0 - hX - gap
     leg.set_bbox_to_anchor((0.5, (desired_top - pos.y0) / max(pos.height, 1e-6)))
-    fig.canvas.draw()
-    lb2 = leg.get_window_extent(r).transformed(inv)
-    deficit = max(0.0, 0.015 - lb2.y0)
-    if deficit > 0:
-        p2 = ax.get_position()
-        ax.set_position([p2.x0, p2.y0 + deficit, p2.width,
-                         max(p2.height - deficit, 0.05)])
 
 
 def _apply_aspect(ax, panel: dict) -> None:
@@ -1172,41 +1172,69 @@ DRAWS = {"field": draw_field, "swarm": draw_swarm, "curve": draw_curve,
          "stress": draw_stress}
 
 
-def _layout(orientation: str, npanels: int, layout: dict | None = None) -> tuple[int, int, dict, list, list]:
-    """A4 画板子图布局：返回 (rows, cols, figsize, height_ratios, width_ratios)。
+def _parse_template(tpl: object) -> list | None:
+    """'2+1' / '2x2' → [2,1] / [2,2]（每行格数）；非法返回 None。"""
+    if not tpl:
+        return None
+    parts = [p for p in str(tpl).lower().replace("x", "+").split("+") if p.strip()]
+    try:
+        rows_spec = [int(p) for p in parts]
+    except ValueError:
+        return None
+    if not rows_spec or any(r <= 0 for r in rows_spec):
+        return None
+    return rows_spec
 
-    layout 可选字段：
-      rows / cols            -> 用户指定行列数（缺省自动推断）
-      height_ratios / width_ratios -> 行高/列宽比例数组（缺省全 1）
+
+def _auto_template(n: int) -> list:
+    """面板数 → 默认模板（论文常见版式）；空列表 = 回退规则网格。"""
+    return {1: [1], 2: [1, 1], 3: [2, 1], 4: [2, 2], 5: [3, 2], 6: [3, 3]}.get(n, [])
+
+
+def _layout(orientation: str, npanels: int, layout: dict | None = None):
+    """A4 画板布局：返回 (rows, cols, figsize, hr, wr, cells, capacity)。
+
+    cells = [(row, col_start, col_span)] 按面板顺序的网格切片（ultraplot 式模板）；
+    模板语法 '2+1'/'4+1'/'2x2'：每行格数，行内等宽，格数少的行自动通栏合并；
+    cols = 各行格数的最小公倍数。未指定模板且未手动设 rows/cols 时按面板数自动选。
+    layout 另支持 height_ratios（行高比，如 '3,1'）。
     """
-    if orientation == "landscape":
-        figsize = (11.69, 8.27)
-    else:
-        figsize = (8.27, 11.69)
-    rows = cols = 0
-    if layout:
-        try:
-            rows = int(layout.get("rows") or 0)
-        except (TypeError, ValueError):
-            rows = 0
-        try:
-            cols = int(layout.get("cols") or 0)
-        except (TypeError, ValueError):
-            cols = 0
+    figsize = (11.69, 8.27) if orientation == "landscape" else (8.27, 11.69)
+    layout = layout or {}
+    try:
+        m_rows = int(layout.get("rows") or 0)
+        m_cols = int(layout.get("cols") or 0)
+    except (TypeError, ValueError):
+        m_rows = m_cols = 0
+    spec = _parse_template(layout.get("template"))
+    if spec is None and (m_rows <= 0 or m_cols <= 0):
+        spec = _auto_template(npanels) or None
+    if spec is not None:
+        from math import gcd
+        cols = 1
+        for c in spec:
+            cols = cols * c // gcd(cols, c)
+        cells = []
+        for r, cnt in enumerate(spec):
+            span = cols // cnt
+            for k in range(cnt):
+                cells.append((r, k * span, span))
+        hr = _ratios(layout.get("height_ratios"), len(spec))
+        return len(spec), cols, figsize, hr, [1.0] * cols, cells, len(cells)
+    rows, cols = m_rows, m_cols
     if rows <= 0 or cols <= 0:
-        if npanels <= 0:
-            rows, cols = 1, 1
-        elif npanels == 1:
-            rows, cols = 1, 1
+        if npanels <= 1:
+            rows = cols = 1
         elif npanels == 2:
             rows, cols = 2, 1
         elif npanels <= 4:
-            rows, cols = 2, 2
+            rows = cols = 2
         else:
             rows, cols = int(np.ceil(npanels / 2)), 2
-    hr = _ratios(layout.get("height_ratios") if layout else None, rows)
-    wr = _ratios(layout.get("width_ratios") if layout else None, cols)
-    return rows, cols, figsize, hr, wr
+    hr = _ratios(layout.get("height_ratios"), rows)
+    wr = _ratios(layout.get("width_ratios"), cols)
+    cells = [(i // cols, i % cols, 1) for i in range(rows * cols)]
+    return rows, cols, figsize, hr, wr, cells, rows * cols
 
 
 def _ratios(v: object, n: int) -> list:
@@ -1280,7 +1308,8 @@ def render_plot(req: dict) -> dict:
     orientation = req.get("orientation", "portrait")
     style = dict(C.JOURNAL_STYLE)
     style.update(req.get("style") or {})
-    rows, cols, figsize, hr, wr = _layout(orientation, len(panels), req.get("layout"))
+    rows, cols, figsize, hr, wr, cells, capacity = _layout(
+        orientation, len(panels), req.get("layout"))
 
     plt.rcParams.update({
         "font.family": style.get("font_family", "Arial"),
@@ -1297,13 +1326,12 @@ def render_plot(req: dict) -> dict:
                           height_ratios=hr, width_ratios=wr)
     panel_meta = []
     probe_payloads = {}
-    for i, panel in enumerate(panels[: rows * cols]):
-        # 面板放置：优先用面板自带的 row/col，否则按列表顺序 row-major
-        if isinstance(panel.get("row"), int) and isinstance(panel.get("col"), int):
-            r_, c_ = max(0, min(panel["row"], rows - 1)), max(0, min(panel["col"], cols - 1))
-        else:
-            r_, c_ = i // cols, i % cols
-        ax = fig.add_subplot(gs[r_, c_])
+    dropped = max(0, len(panels) - capacity)
+    for i, panel in enumerate(panels[:capacity]):
+        # 模板放置：cells 由 _layout 按 '2+1' 等模板算出 (row, col_start, span)
+        r_, c0, span = cells[i]
+        ax = fig.add_subplot(gs[r_, c0:c0 + span])
+        cell = gs[r_, c0:c0 + span].get_position(fig)
         kind = panel.get("kind", "field")
         if kind not in DRAWS:
             ax.text(0.5, 0.5, f"unsupported: {kind}", transform=ax.transAxes,
@@ -1318,9 +1346,9 @@ def render_plot(req: dict) -> dict:
                     if _cbax is not ax:
                         ax._h5_cb_ax = _cbax
                 if panel.get("legend_loc") == "outside right":
-                    _fix_outside_right_legend(fig, ax)
+                    _fix_outside_right_legend(fig, ax, cell)
                 elif panel.get("legend_loc") == "outside bottom":
-                    _fix_outside_bottom_legend(fig, ax)
+                    _fix_outside_bottom_legend(fig, ax, cell)
                 if panel.get("title"):
                     ax.set_title(panel["title"], fontsize=style.get("title_size", 8))
                 # 面板标注 (a) (b) ...
@@ -1375,6 +1403,7 @@ def render_plot(req: dict) -> dict:
         "figsize_in": figsize,
         "orientation": orientation,
         "dpi": PREVIEW_DPI,
+        "layout": {"rows": rows, "cols": cols, "dropped": dropped},
         "panels": panel_meta,
         "files": {
             "png": f"/api/plots/{plot_id}.png",
@@ -1410,8 +1439,8 @@ def ensure_hi_res(plot_id: str) -> bool:
     orientation = spec.get("orientation", "portrait")
     style = dict(C.JOURNAL_STYLE)
     style.update(spec.get("style") or {})
-    rows, cols, figsize, hr, wr = _layout(orientation, len(spec.get("panels") or []),
-                                          spec.get("layout"))
+    rows, cols, figsize, hr, wr, cells, capacity = _layout(
+        orientation, len(spec.get("panels") or []), spec.get("layout"))
     plt.rcParams.update({
         "font.family": style.get("font_family", "Arial"),
         "font.size": style.get("font_size", 7),
@@ -1424,15 +1453,21 @@ def ensure_hi_res(plot_id: str) -> bool:
     gs = fig.add_gridspec(rows, cols,
                           hspace=style.get("panel_gap", 0.55), wspace=0.35,
                           height_ratios=hr, width_ratios=wr)
-    for i, panel in enumerate((spec.get("panels") or [])[: rows * cols]):
-        if isinstance(panel.get("row"), int) and isinstance(panel.get("col"), int):
-            r_, c_ = max(0, min(panel["row"], rows - 1)), max(0, min(panel["col"], cols - 1))
-        else:
-            r_, c_ = i // cols, i % cols
-        ax = fig.add_subplot(gs[r_, c_])
+    for i, panel in enumerate((spec.get("panels") or [])[:capacity]):
+        r_, c0, span = cells[i]
+        ax = fig.add_subplot(gs[r_, c0:c0 + span])
+        cell = gs[r_, c0:c0 + span].get_position(fig)
         kind = panel.get("kind", "field")
+        n_axes_before = len(fig.axes)
         try:
             DRAWS[kind](ax, panel, style)
+            for _cbax in fig.axes[n_axes_before:]:
+                if _cbax is not ax:
+                    ax._h5_cb_ax = _cbax
+            if panel.get("legend_loc") == "outside right":
+                _fix_outside_right_legend(fig, ax, cell)
+            elif panel.get("legend_loc") == "outside bottom":
+                _fix_outside_bottom_legend(fig, ax, cell)
             if panel.get("label") or spec.get("auto_panel_labels", True):
                 lab = panel.get("label") or _panel_label(i)
                 ax.text(0.005, 0.97, lab, transform=ax.transAxes,

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>H5Plot Studio — UW/Badlands h5 检视与 A4 绘图</title>
-<link rel="stylesheet" href="/static/style.css?v=20260822b">
+<link rel="stylesheet" href="/static/style.css?v=20260822c">
 </head>
 <body>
 
@@ -112,6 +112,12 @@
           <label>行数 rows<input type="number" id="cfg-rows" value="" min="1" max="12" placeholder="自动"></label>
           <label>列数 cols<input type="number" id="cfg-cols" value="" min="1" max="8" placeholder="自动"></label>
         </div>
+        <label class="tpl-label">排版模板（不规则版式）
+          <div id="tpl-row" class="tpl-row"></div>
+        </label>
+        <label>行高比 (逗号, 如 3,1)
+          <input id="cfg-height-ratios" placeholder="1,1">
+        </label>
         <small id="layout-now" style="color:var(--accent);font-weight:600"></small>
         <small style="color:var(--muted)">灰显数字=自动布局实时值；手动输入即接管，清空恢复自动。物理等比（如 800km:160km→5:1）用「统一横纵比」或面板「横纵比」。</small>
       </div>
@@ -145,10 +151,9 @@
       <div class="cfg-section">
         <h3>面板</h3>
         <div id="panel-list"></div>
-        <div class="btn-row">
-          <button id="add-field" class="mini">+ 场图</button>
-          <button id="add-swarm" class="mini">+ 粒子图</button>
-          <button id="add-curve" class="mini">+ 曲线</button>
+        <div class="add-wrap">
+          <button id="add-panel-btn" class="mini add-btn">＋ 添加面板 ▾</button>
+          <div id="add-menu" class="add-menu hidden"></div>
         </div>
       </div>
 
@@ -171,6 +176,6 @@
 
 <div id="toast"></div>
 
-<script src="/static/app.js?v=20260822b"></script>
+<script src="/static/app.js?v=20260822c"></script>
 </body>
 </html>

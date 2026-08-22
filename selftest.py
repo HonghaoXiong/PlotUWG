@@ -349,6 +349,44 @@ def t_overlay_scatter_two_sided():
     assert meta["panels"][0]["overlays"]["field"] == 1
 check("应变散点双向阈值 + 场叠加显示范围筛选", t_overlay_scatter_two_sided)
 
+def t_template_2plus1():
+    # ultraplot 式模板：第一行 2 列 + 第二行通栏；外底图例/colorbar 不侵入邻面板
+    meta = P.render_plot({
+        "orientation": "portrait", "style": {},
+        "layout": {"template": "2+1", "height_ratios": "2,1"},
+        "panels": [
+            {"kind": "material", "file": UW + "/swarm-200.h5",
+             "material_file": UW + "/materialField-200.h5",
+             "legend": True, "legend_loc": "outside bottom", "legend_ncol": 3,
+             "overlays": [{"type": "scatter", "file": UW + "/plasticStrain-200.h5",
+                           "cmap": "hot_r", "vmin": 1.5, "vmax": 4.5,
+                           "mask_value": {"ge": 1.5}, "colorbar": True}]},
+            {"kind": "field", "file": UW + "/temperature-200.h5",
+             "mesh_file": UW + "/mesh.h5", "cmap": "turbo"},
+            {"kind": "stress", "file": UW + "/projStressTensor-200.h5",
+             "mesh_file": UW + "/mesh.h5", "column": 1, "cmap": "RdBu_r",
+             "vmin": -8, "vmax": 8},
+        ],
+    })
+    assert meta["layout"]["rows"] == 2 and meta["layout"]["dropped"] == 0
+    assert len(meta["panels"]) == 3
+    p0, p2 = meta["panels"][0], meta["panels"][2]
+    assert p0["y0_px"] >= p2["y0_px"] + p2["h_px"] - 1   # 上下不重叠
+check("模板 2+1（行1两列 + 行2通栏，元素不跨面板）", t_template_2plus1)
+
+def t_template_dropped():
+    # 容量溢出：2+1 只容 3 个，塞 4 个 → dropped=1
+    base = {"kind": "field", "file": UW + "/temperature-200.h5",
+            "mesh_file": UW + "/mesh.h5", "cmap": "turbo"}
+    meta = P.render_plot({
+        "orientation": "portrait", "style": {},
+        "layout": {"template": "2+1"},
+        "panels": [dict(base) for _ in range(4)],
+    })
+    assert meta["layout"]["dropped"] == 1
+    assert len(meta["panels"]) == 3
+check("模板容量溢出 dropped 计数", t_template_dropped)
+
 print("== 3. probe 点击读数 ==")
 from core import probe
 

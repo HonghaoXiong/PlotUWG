@@ -878,3 +878,71 @@ body.resizing .splitter { pointer-events: auto; }
 #cfg-rows[dataset-auto], #cfg-cols[dataset-auto] { color: var(--muted); }
 #cfg-rows.auto, #cfg-cols.auto { color: var(--muted); }
 input[data-auto] { color: var(--muted) !important; }
+
+/* ============================================================
+   v0.5.0 模板画廊 / 添加面板菜单 / Apple 级交互反馈
+   ============================================================ */
+:root { --ease-press: cubic-bezier(0.32, 0.72, 0.28, 1); }
+
+/* 模板芯片（ultraplot 式版式选择器） */
+.tpl-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.tpl {
+  width: 42px; height: 36px; padding: 6px; border-radius: 10px; cursor: pointer;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: linear-gradient(180deg, rgba(255,255,255,.94), rgba(255,255,255,.72));
+  box-shadow: 0 1px 0 rgba(255,255,255,.9) inset, 0 1px 2px rgba(0,0,0,.06);
+  transition: transform .18s var(--ease-press), box-shadow .2s var(--ease), border-color .2s;
+}
+.tpl:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,.10); }
+.tpl:active { transform: scale(.92); }
+.tpl.sel { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,122,255,.16); }
+.tpl-glyph { display: flex; flex-direction: column; gap: 2px; width: 100%; height: 100%; }
+.tpl-r { display: grid; gap: 2px; flex: 1; min-height: 0; }
+.tpl-r i { display: block; border-radius: 2px; background: rgba(0,0,0,.25); }
+.tpl.sel .tpl-r i { background: var(--accent); opacity: .8; }
+
+/* 添加面板下拉（玻璃菜单） */
+.add-wrap { position: relative; }
+.add-btn { width: 100%; padding: 10px 14px; font-size: 12.5px; font-weight: 650; }
+.add-menu {
+  position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 40;
+  display: flex; flex-direction: column; gap: 2px; padding: 6px;
+  border-radius: 14px; border: 1px solid rgba(255,255,255,.65);
+  background: rgba(250, 250, 252, 0.88);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
+  box-shadow: 0 12px 40px rgba(0,0,0,.14), 0 2px 8px rgba(0,0,0,.06);
+  animation: menu-in .22s var(--ease);
+}
+.add-item {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
+  padding: 8px 10px; border: none; background: transparent; border-radius: 10px;
+  cursor: pointer; text-align: left;
+  transition: background .15s var(--ease), transform .15s var(--ease-press);
+}
+.add-item:hover { background: rgba(0,122,255,.08); }
+.add-item:active { background: rgba(0,122,255,.15); transform: scale(.98); }
+.add-item b { font-size: 12.5px; color: var(--text); font-weight: 650; }
+.add-item small { font-size: 11px; color: var(--muted); line-height: 1.4; }
+@keyframes menu-in { from { opacity: 0; transform: translateY(-6px) scale(.98); } }
+
+/* Apple 级按压反馈：所有按钮按压缩放 + 提饱和 */
+#plot-config button, .step-bar button, .file-nav button, header button {
+  transition: transform .18s var(--ease-press), box-shadow .2s var(--ease),
+              background .2s var(--ease), filter .2s var(--ease);
+}
+#plot-config button:active, .step-bar button:active, .file-nav button:active, header button:active {
+  transform: scale(.96); filter: saturate(1.12) brightness(.98);
+}
+
+/* 面板卡片进场动画 */
+.panel-card { animation: card-in .26s var(--ease); }
+@keyframes card-in { from { opacity: 0; transform: translateY(8px) scale(.985); } }
+
+/* 无障碍：偏好减少动效时关闭位移/扫光 */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    transition-duration: .01ms !important;
+  }
+}

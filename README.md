@@ -12,6 +12,11 @@
 - Auto time-step bar: one click to switch any step across all fields
 
 ### 📊 A4 plot studio
+- **Layout templates (ultraplot-style)**: irregular grids like `2+1` / `4+1` / `3+2`
+  (row-1 two columns + row-2 full-width, etc.) via a visual template gallery;
+  auto template by panel count; row-height ratios (`3,1`); outside legends &
+  colorbars are reserved **inside each panel's grid cell** so elements never
+  stack onto neighbouring panels; overflow panels counted as `dropped`
 - **Material field** base layer (swarm + materialField) with the **Qaidam palette** (Air / Sed / Lithospheric Mantle / Qaidam UC-MC-LC / Orogen UC-MC-LC, matched to the paper convention)
 - **Interface lines panel** — pick any material index and draw its **top surface**
   (per-column max y), **bottom surface** (per-column min y) or the **full scatter

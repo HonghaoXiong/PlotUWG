@@ -28,6 +28,19 @@ const I18N_EN = {
   "cb pad (与图间距)": "cb pad (gap)", "cb fraction (宽)": "cb fraction (width)",
   "cb 位置": "cb location",
   "采样上限 (空=默认20万, 越大边界越平滑)": "Max samples (empty=default; higher = smoother)",
+  "排版模板（不规则版式）": "Layout template (irregular grids)",
+  "行高比 (逗号, 如 3,1)": "Row heights (comma, e.g. 3,1)",
+  "＋ 添加面板 ▾": "+ Add panel ▾",
+  "场图": "Field", "物质场": "Material", "界面线 · 物质顶/底线": "Interfaces · material top/bottom",
+  "应力场": "Stress field", "粒子图": "Swarm", "曲线 · 1D 数据": "Curve · 1D data",
+  "mesh 节点场（温度/粘度等）": "mesh node fields (temperature, viscosity...)",
+  "粒子配色 + 等温线/应变/矢量叠加": "particle colors + contour/strain/vector overlays",
+  "指定物质顶面/底面连线或全散点，列分辨率可调": "top/bottom line or full scatter of a material; column resolution adjustable",
+  "σxx/σyy/σxy 单元中心，RdBu 发散": "σxx/σyy/σxy on element centers, diverging RdBu",
+  "swarm 散点 / 数值列着色": "swarm scatter / numeric column",
+  "Badlands cumdiff 等；物质顶/底线请用『界面线』": "Badlands cumdiff etc.; use Interfaces for material top/bottom",
+  "曲线用于 1D dataset（如 Badlands 的 cumdiff）；要画指定物质的顶/底线请用「界面线」面板（＋ 添加面板 菜单）。":
+    "Curve is for 1D datasets (e.g. Badlands cumdiff); use the Interfaces panel for material top/bottom lines.",
   "显示范围 (a,b, 只画区间内)": "Value range (a,b, keep inside)",
   "值下限 (≥)": "Value ≥", "值上限 (≤)": "Value ≤",
   "y 下限 (≥)": "y ≥", "y 上限 (<)": "y <",
@@ -199,6 +212,7 @@ const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
 const state = {
   currentDir: "",
+  layoutTemplate: "",    // 排版模板（'2+1' 等；空=自动/手动行列）
   fileInfo: null,        // 当前打开的 h5 文件信息（检视器）
   panels: [],            // 绘图面板列表
   plotMeta: null,        // 最近一次渲染元信息
@@ -315,9 +329,7 @@ function bindEvents() {
   // 绘图
   $("#render-btn").onclick = renderPlot;
   $("#export-btn").onclick = exportPlot;
-  $("#add-field").onclick = () => addPanel({ kind: "field" });
-  $("#add-swarm").onclick = () => addPanel({ kind: "swarm" });
-  $("#add-curve").onclick = () => addPanel({ kind: "curve" });
+  // 添加面板入口已合并为 #add-panel-btn 下拉（initAddMenu）
   $("#plot-img").addEventListener("click", onPlotClick);
   $("#plot-img").addEventListener("mousemove", (e) => moveTip(e));
   $("#plot-img").addEventListener("mouseleave", () => $("#probe-tip").style.display = "none");
@@ -325,11 +337,11 @@ function bindEvents() {
   // 配置变化即时保存
   ["cfg-font", "cfg-font-size", "cfg-label-size", "cfg-linewidth",
    "cfg-legend-size", "cfg-tick-dir", "cfg-orientation", "cfg-svgtext",
-   "cfg-panel-labels", "cfg-rows", "cfg-cols", "cfg-aspect", "cfg-aspect-num"].forEach((id) => {
+   "cfg-panel-labels", "cfg-rows", "cfg-cols", "cfg-aspect", "cfg-aspect-num", "cfg-height-ratios"].forEach((id) => {
     const el = document.getElementById(id);
     if (!el) return;
     el.addEventListener("change", () => {
-      if (id === "cfg-rows" || id === "cfg-cols") delete el.dataset.auto;  // 手动编辑即接管
+      if (id === "cfg-rows" || id === "cfg-cols") { delete el.dataset.auto; state.layoutTemplate = ""; renderTplPicker(); }  // 手动编辑即接管
       if (id === "cfg-aspect") {
         const row = document.getElementById("cfg-aspect-num-row");
         if (row) row.classList.toggle("hidden", el.value !== "custom");
@@ -338,6 +350,8 @@ function bindEvents() {
     });
   });
   initSplitters();
+  renderTplPicker();
+  initAddMenu();
 }
 
 /* 左右侧栏拖拽调宽（ParaView/Inkscape 式 splitter：拖拽调宽、双击复位、持久化） */
@@ -963,7 +977,7 @@ function renderPanels() {
           ${advancedHTML(i, p, { vmin: true, marker: true, cb: true })}
         </details>`;
     } else if (p.kind === "curve") {
-      html += `
+      html += `<small class="hint">曲线用于 1D dataset（如 Badlands 的 cumdiff）；要画指定物质的顶/底线请用「界面线」面板（＋ 添加面板 菜单）。</small>
         <label>列（逗号分隔） <input data-f="columns_str" data-i="${i}" value="${(p.columns || [0]).join(",")}"></label>
         <label><input type="checkbox" data-f="legend" data-i="${i}" ${p.legend === false ? "" : "checked"}> 图例</label>
         <label>图例位置<select data-f="legend_loc" data-i="${i}">
@@ -1579,9 +1593,81 @@ function collectLayout() {
   const wr = wrEl ? wrEl.value.trim() : "";
   if (!isNaN(rows) && rows > 0) layout.rows = rows;
   if (!isNaN(cols) && cols > 0) layout.cols = cols;
+  if (state.layoutTemplate && isNaN(rows) && isNaN(cols)) layout.template = state.layoutTemplate;
   if (hr) layout.height_ratios = hr;
   if (wr) layout.width_ratios = wr;
   return Object.keys(layout).length ? layout : undefined;
+}
+
+/* 模板语法前端解析（与后端一致）：'2+1' → [2,1] */
+function _tplSpec(t) {
+  if (!t) return null;
+  const a = String(t).toLowerCase().replace("x", "+").split("+").map((s) => parseInt(s.trim(), 10));
+  return a.length && a.every((n) => n > 0) ? a : null;
+}
+
+/* 模板画廊（ultraplot 式版式选择器） */
+const TPL_PRESETS = ["1", "1+1", "2+1", "1+2", "2+2", "3+1", "4+1", "3+2"];
+function tplGlyph(t) {
+  const rowsSpec = _tplSpec(t) || [1];
+  return `<span class="tpl-glyph">` + rowsSpec.map((c) =>
+    `<span class="tpl-r" style="grid-template-columns:repeat(${c},1fr)">${"<i></i>".repeat(c)}</span>`).join("") + `</span>`;
+}
+function renderTplPicker() {
+  const row = $("#tpl-row");
+  if (!row) return;
+  row.innerHTML = "";
+  TPL_PRESETS.forEach((t) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "tpl" + (state.layoutTemplate === t ? " sel" : "");
+    b.title = tr(`模板 ${t}`, `Template ${t}`);
+    b.innerHTML = tplGlyph(t);
+    b.onclick = () => {
+      state.layoutTemplate = state.layoutTemplate === t ? "" : t;
+      if (state.layoutTemplate) {
+        ["#cfg-rows", "#cfg-cols"].forEach((s) => { const el = $(s); if (el) { el.value = ""; delete el.dataset.auto; } });
+      }
+      renderTplPicker(); syncLayoutInputs(); saveConfigSilent(); scheduleAutoRender();
+    };
+    row.appendChild(b);
+  });
+}
+
+/* “＋ 添加面板”下拉菜单 */
+const ADD_ITEMS = [
+  ["field", "场图", "mesh 节点场（温度/粘度等）"],
+  ["material", "物质场", "粒子配色 + 等温线/应变/矢量叠加"],
+  ["surfaces", "界面线 · 物质顶/底线", "指定物质顶面/底面连线或全散点，列分辨率可调"],
+  ["stress", "应力场", "σxx/σyy/σxy 单元中心，RdBu 发散"],
+  ["swarm", "粒子图", "swarm 散点 / 数值列着色"],
+  ["curve", "曲线 · 1D 数据", "Badlands cumdiff 等；物质顶/底线请用『界面线』"],
+];
+function addPanelByKind(kind) {
+  const sel = $("#step-bar select");
+  const dir = state.currentDir || "";
+  const step = sel ? parseInt(sel.value, 10) : 0;
+  if (kind === "surfaces" && dir) generateSurfacesPanel(step, dir);
+  else if (kind === "stress" && dir) generateStressPanel(step, dir);
+  else if (kind === "material" && dir && state.modelScan) addPanel(buildMaterialPanel(step, dir, state.modelScan, "default"));
+  else addPanel({ kind });
+}
+function initAddMenu() {
+  const btn = $("#add-panel-btn"), menu = $("#add-menu");
+  if (!btn || !menu) return;
+  menu.innerHTML = "";
+  ADD_ITEMS.forEach(([kind, name, desc]) => {
+    const it = document.createElement("button");
+    it.type = "button";
+    it.className = "add-item";
+    it.innerHTML = `<b>${tr(name)}</b><small>${tr(desc)}</small>`;
+    it.onclick = () => { menu.classList.add("hidden"); addPanelByKind(kind); switchTab("plot"); };
+    menu.appendChild(it);
+  });
+  btn.onclick = (e) => { e.stopPropagation(); menu.classList.toggle("hidden"); };
+  document.addEventListener("click", (e) => {
+    if (!menu.classList.contains("hidden") && !menu.contains(e.target) && e.target !== btn) menu.classList.add("hidden");
+  });
 }
 
 /* 画板全局统一横纵比（面板自身未设置时生效） */
@@ -1601,12 +1687,14 @@ function syncLayoutInputs() {
   const rowsEl = $("#cfg-rows"), colsEl = $("#cfg-cols");
   if (!rowsEl || !colsEl) return;
   const n = state.panels.length;
-  const mRows = rowsEl.dataset.auto ? NaN : parseInt(rowsEl.value, 10);
-  const mCols = colsEl.dataset.auto ? NaN : parseInt(colsEl.value, 10);
+  const tspec = _tplSpec(state.layoutTemplate);
+  const mRows = tspec ? NaN : (rowsEl.dataset.auto ? NaN : parseInt(rowsEl.value, 10));
+  const mCols = tspec ? NaN : (colsEl.dataset.auto ? NaN : parseInt(colsEl.value, 10));
   let rows, cols;
   if (!isNaN(mRows) && mRows > 0 && !isNaN(mCols) && mCols > 0) { rows = mRows; cols = mCols; }
   else if (!isNaN(mRows) && mRows > 0) { rows = mRows; cols = Math.max(1, Math.ceil(n / rows)); }
   else if (!isNaN(mCols) && mCols > 0) { cols = mCols; rows = Math.max(1, Math.ceil(n / cols)); }
+  else if (tspec) { rows = tspec.length; cols = Math.max(...tspec); }
   else if (n <= 1) { rows = cols = 1; }
   else if (n === 2) { rows = 2; cols = 1; }
   else if (n <= 4) { rows = cols = 2; }
@@ -1729,6 +1817,10 @@ function applyConfigToUI(cfg) {
   const lay = cfg.layout || {};
   if (lay.rows) $("#cfg-rows").value = lay.rows;
   if (lay.cols) $("#cfg-cols").value = lay.cols;
+  state.layoutTemplate = lay.template || "";
+  renderTplPicker();
+  const hrIn = $("#cfg-height-ratios");
+  if (hrIn && lay.height_ratios) hrIn.value = Array.isArray(lay.height_ratios) ? lay.height_ratios.join(",") : lay.height_ratios;
   const hrEl = $("#cfg-height-ratios");
   const wrEl = $("#cfg-width-ratios");
   if (hrEl && lay.height_ratios) hrEl.value = Array.isArray(lay.height_ratios) ? lay.height_ratios.join(",") : lay.height_ratios;
