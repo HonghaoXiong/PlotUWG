@@ -277,7 +277,12 @@ async function boot() {
   try { state.config = await api("/api/config", {}, "GET"); applyConfigToUI(state.config); } catch (_) {}
   loadPanels();
   try { const h = await api("/api/home", {}, "GET"); state.homeDir = h.path || ""; } catch (_) { state.homeDir = ""; }
-  try { const c = await api("/api/cmaps", {}, "GET"); state.cmapColors = c.cmaps || {}; } catch (_) { state.cmapColors = {}; }
+  try {
+    const c = await api("/api/cmaps", {}, "GET");
+    state.cmapColors = c.cmaps || {}; state.qgisNames = c.qgis || [];
+    // QGIS 配色到达后重建已存在的色板下拉（保留当前选择）
+    $$("#panel-list select[data-f=cmap], #panel-list select[data-ovf=cmap]").forEach((s) => { const v = s.value; fillCmapSelect(s); if (v) s.value = v; });
+  } catch (_) { state.cmapColors = {}; state.qgisNames = []; }
   renderCmapPreviews();
   const recent = await api("/api/recent", {}, "GET").catch(() => ({ paths: [] }));
   renderRecent(recent.paths || []);
@@ -1489,8 +1494,11 @@ function fillCmapSelect(sel) {
   const opts = [
     `<optgroup label="内置预设">` + presets.map((o) => `<option value="${o}">${o}</option>`).join("") + `</optgroup>`,
     `<optgroup label="连续色板">` + conts.map((o) => `<option value="${o}">${o}</option>`).join("") + `</optgroup>`,
-  ].join("");
-  sel.innerHTML = opts;
+  ];
+  if ((state.qgisNames || []).length) {
+    opts.push(`<optgroup label="QGIS 配色">` + state.qgisNames.map((o) => `<option value="${o}">${o}</option>`).join("") + `</optgroup>`);
+  }
+  sel.innerHTML = opts.join("");
 }
 
 /* 色板预览条（渐变） */
@@ -1518,11 +1526,13 @@ function cmapSelectHTML(i, oi, current, fallback) {
     "tab10", "Set1", "Dark2"];
   const val = current || fallback || "turbo";
   const opt = (v, lbl) => `<option value="${v}" ${val === v ? "selected" : ""}>${lbl || v}</option>`;
+  let groups = `<optgroup label="内置预设">` + presets.map((o) => opt(o)).join("") + `</optgroup>` +
+    `<optgroup label="连续色板">` + conts.map((o) => opt(o)).join("") + `</optgroup>`;
+  if ((state.qgisNames || []).length) {
+    groups += `<optgroup label="QGIS 配色">` + state.qgisNames.map((o) => opt(o)).join("") + `</optgroup>`;
+  }
   return `<div class="cmap-row2">` +
-    `<select data-act="ov-field" data-ovf="cmap" data-i="${i}" data-oi="${oi}">` +
-    `<optgroup label="内置预设">` + presets.map((o) => opt(o)).join("") + `</optgroup>` +
-    `<optgroup label="连续色板">` + conts.map((o) => opt(o)).join("") + `</optgroup>` +
-    `</select>` +
+    `<select data-act="ov-field" data-ovf="cmap" data-i="${i}" data-oi="${oi}">` + groups + `</select>` +
     cmapPreviewHTML(val, `cmap-prev-${i}-${oi}`) +
     `</div>`;
 }

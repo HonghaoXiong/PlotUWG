@@ -331,6 +331,10 @@ def _resolve_cmap(panel: dict, discrete: bool = False, default: str = "turbo"):
         if discrete:
             return matplotlib.colors.ListedColormap(vals)
         return matplotlib.colors.LinearSegmentedColormap.from_list("preset", vals, 256)
+    from .qgis_cmaps import get_cmap as _qgis_cmap
+    q = _qgis_cmap(panel.get("cmap", ""))
+    if q is not None:
+        return q
     return plt.get_cmap(panel.get("cmap", default))
 
 

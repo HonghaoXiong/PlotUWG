@@ -387,6 +387,24 @@ def t_template_dropped():
     assert len(meta["panels"]) == 3
 check("模板容量溢出 dropped 计数", t_template_dropped)
 
+def t_qgis_cmaps():
+    # 本地 QGIS 配色库（用户 profile DB / 自带 XML）→ 可作场图色板
+    from core import qgis_cmaps as QG
+    ramps = QG.load_qgis_ramps(force=True)
+    if not ramps:
+        print("  (本机无 QGIS，跳过)")
+        return
+    assert len(ramps) > 50
+    assert all(len(v) == 16 and v[0].startswith("#") for v in list(ramps.values())[:10])
+    name = sorted(ramps)[5]
+    meta = P.render_plot({
+        "orientation": "portrait", "style": {},
+        "panels": [{"kind": "field", "file": UW + "/temperature-0.h5",
+                    "mesh_file": UW + "/mesh.h5", "cmap": name}],
+    })
+    assert meta["panels"][0]["kind"] == "field"
+check("QGIS 配色库加载 + 场图渲染", t_qgis_cmaps)
+
 print("== 3. probe 点击读数 ==")
 from core import probe
 

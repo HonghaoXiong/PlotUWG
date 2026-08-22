@@ -17,7 +17,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 APP_NAME="PlotUWG"
-VERSION="0.6.0"
+VERSION="0.6.1"
 ARCH="$(python -c 'import platform; print(platform.machine())')"
 
 echo "==> 清理旧构建"
