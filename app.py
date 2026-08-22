@@ -20,7 +20,7 @@ from core import h5inspector
 
 # 注意：plotters/probe 涉及 matplotlib，延迟到路由内 import（启动提速，不阻塞窗口）
 
-app = FastAPI(title="H5Plot Studio", version="0.4.0")
+app = FastAPI(title="H5Plot Studio", version="0.4.1")
 
 # PyInstaller 打包后 web/ 位于 _MEIPASS；源码运行时位于本文件旁
 if getattr(sys, "frozen", False):
@@ -33,7 +33,8 @@ app.mount("/static", StaticFiles(directory=str(WEB_DIR)), name="static")
 
 @app.get("/")
 def index():
-    return FileResponse(WEB_DIR / "index.html")
+    # HTML 入口不缓存（静态资源带版本号查询串，可长缓存）
+    return FileResponse(WEB_DIR / "index.html", headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/health")

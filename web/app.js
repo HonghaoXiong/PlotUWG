@@ -59,6 +59,10 @@ const I18N_EN = {
   "＋ 多时间步四连图…": "+ Multi-step grid...",
   "＋ 界面线 (Topo/Moho/Sed)": "+ Interfaces (Topo/Moho/Sed)",
   "＋ 应力场 (σyy)": "+ Stress field (σyy)",
+  "统一横纵比": "Unified aspect", "各面板自定": "Per panel",
+  "自定义数值 (y 相对 x 拉伸)": "Custom value (y stretch vs x)",
+  "灰显数字=自动布局实时值；手动输入即接管，清空恢复自动。物理等比（如 800km:160km→5:1）用「统一横纵比」或面板「横纵比」。":
+    "Grey numbers = live auto-layout; type to take over, clear to restore auto. Physical aspect via Unified aspect or per-panel aspect.",
   "界面线": "Interfaces", "+ 界面线": "+ Interface line",
   "列数 (列分辨率)": "Columns (resolution)",
   "提取 x 范围 (a,b, 留空=全部)": "Extract x range (a,b, empty=all)",
@@ -120,9 +124,9 @@ const I18N_EN = {
   "🔄": "🔄",
 };
 
-function tr(s) {
+function tr(s, enFallback) {
   if (!s) return s;
-  if (LANG === "en") return I18N_EN[s] || s;
+  if (LANG === "en") return I18N_EN[s] || enFallback || s;
   return s;
 }
 
@@ -316,11 +320,53 @@ function bindEvents() {
   // 配置变化即时保存
   ["cfg-font", "cfg-font-size", "cfg-label-size", "cfg-linewidth",
    "cfg-legend-size", "cfg-tick-dir", "cfg-orientation", "cfg-svgtext",
-   "cfg-panel-labels", "cfg-rows", "cfg-cols"].forEach((id) => {
+   "cfg-panel-labels", "cfg-rows", "cfg-cols", "cfg-aspect", "cfg-aspect-num"].forEach((id) => {
     const el = document.getElementById(id);
     if (!el) return;
-    el.addEventListener("change", () => { saveConfigSilent(); scheduleAutoRender(); });
+    el.addEventListener("change", () => {
+      if (id === "cfg-rows" || id === "cfg-cols") delete el.dataset.auto;  // 手动编辑即接管
+      if (id === "cfg-aspect") {
+        const row = document.getElementById("cfg-aspect-num-row");
+        if (row) row.classList.toggle("hidden", el.value !== "custom");
+      }
+      saveConfigSilent(); scheduleAutoRender();
+    });
   });
+  initSplitters();
+}
+
+/* 左右侧栏拖拽调宽（ParaView/Inkscape 式 splitter：拖拽调宽、双击复位、持久化） */
+function initSplitters() {
+  const setup = (handleId, targetId, side, min, max, storeKey) => {
+    const h = document.getElementById(handleId), t = document.getElementById(targetId);
+    if (!h || !t) return;
+    const saved = parseFloat(localStorage.getItem(storeKey));
+    if (!isNaN(saved) && saved >= min && saved <= max) t.style.width = saved + "px";
+    h.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      const startX = e.clientX, startW = t.getBoundingClientRect().width;
+      h.classList.add("active"); document.body.classList.add("resizing");
+      const move = (ev) => {
+        let w = side === "left" ? startW + (ev.clientX - startX) : startW - (ev.clientX - startX);
+        w = Math.min(max, Math.max(min, w));
+        t.style.width = w + "px";
+      };
+      const up = () => {
+        h.classList.remove("active"); document.body.classList.remove("resizing");
+        document.removeEventListener("mousemove", move);
+        document.removeEventListener("mouseup", up);
+        localStorage.setItem(storeKey, String(Math.round(t.getBoundingClientRect().width)));
+      };
+      document.addEventListener("mousemove", move);
+      document.addEventListener("mouseup", up);
+    });
+    h.addEventListener("dblclick", () => {
+      t.style.width = ""; localStorage.removeItem(storeKey);
+    });
+    h.title = tr("拖拽调整宽度，双击复位", "Drag to resize, double-click to reset");
+  };
+  setup("split-left", "file-panel", "left", 200, 520, "h5split_left");
+  setup("split-right", "plot-config", "right", 300, 640, "h5split_right");
 }
 
 function switchTab(name) {
@@ -881,7 +927,7 @@ function renderPanels() {
         <details><summary>更多选项</summary>
           <label>xlabel <input data-f="xlabel" data-i="${i}" value="${esc(p.xlabel || "")}"></label>
           <label>ylabel <input data-f="ylabel" data-i="${i}" value="${esc(p.ylabel || "")}"></label>
-          <label>横纵比 ${aspectHTML(i, p.aspect)}</label>
+          ${aspectHTML(i, p.aspect)}
           <label>xlim (a,b) <input data-f="xlim" data-i="${i}" value="${(p.xlim || []).join(",")}" placeholder="0,800"></label>
           <label>ylim (a,b) <input data-f="ylim" data-i="${i}" value="${(p.ylim || []).join(",")}" placeholder="-160,10"></label>
           <label>显示范围 (a,b, 只画区间内) <input data-f="mask_range" data-i="${i}" value="${(p.mask_range || []).join(",")}" placeholder="留空=全部"></label>
@@ -905,7 +951,7 @@ function renderPanels() {
         <details><summary>更多选项</summary>
           <label>xlabel <input data-f="xlabel" data-i="${i}" value="${esc(p.xlabel || "")}"></label>
           <label>ylabel <input data-f="ylabel" data-i="${i}" value="${esc(p.ylabel || "")}"></label>
-          <label>横纵比 ${aspectHTML(i, p.aspect)}</label>
+          ${aspectHTML(i, p.aspect)}
           <label>marker 大小 <input type="number" data-f="marker_size" data-i="${i}" value="${p.marker_size ?? 1}" step="0.5"></label>
           <label>xlim (a,b) <input data-f="xlim" data-i="${i}" value="${(p.xlim || []).join(",")}"></label>
           <label>ylim (a,b) <input data-f="ylim" data-i="${i}" value="${(p.ylim || []).join(",")}"></label>
@@ -1153,6 +1199,7 @@ function renderPanels() {
       scheduleAutoRender();
     });
   });
+  syncLayoutInputs();   // Rows/Cols 实时反映当前生效布局
 }
 
 function surfacesCardHTML(p, i) {
@@ -1192,6 +1239,7 @@ function surfacesCardHTML(p, i) {
   });
   html += `<div class="btn-row"><button class="mini" data-act="srf-add" data-i="${i}">+ 界面线</button></div>`;
   html += `<label><input type="checkbox" data-f="legend" data-i="${i}" ${p.legend === false ? "" : "checked"}> 图例</label>`;
+  html += aspectHTML(i, p.aspect);
   html += `<details><summary>坐标/标签</summary>
     <label>x lim <input data-f="xlim" data-i="${i}" value="${(p.xlim || []).join(",")}" placeholder="0,800"></label>
     <label>y lim <input data-f="ylim" data-i="${i}" value="${(p.ylim || []).join(",")}" placeholder="-150,10"></label>
@@ -1215,6 +1263,7 @@ function stressCardHTML(p, i) {
   html += `<label>vmin <input type="number" step="any" data-f="vmin" data-i="${i}" value="${p.vmin ?? -8}"></label>`;
   html += `<label>vmax <input type="number" step="any" data-f="vmax" data-i="${i}" value="${p.vmax ?? 8}"></label>`;
   html += `<label>显示范围 (a,b, 只画区间内) <input data-f="mask_range" data-i="${i}" value="${(p.mask_range || []).join(",")}" placeholder="留空=全部"></label>`;
+  html += aspectHTML(i, p.aspect);
   html += `<label>colorbar 标签 <input data-f="cbar_label" data-i="${i}" value="${esc(p.cbar_label || "Stress [MPa]")}"></label>`;
   html += `<details><summary>坐标/标签</summary>
     <label>x lim <input data-f="xlim" data-i="${i}" value="${(p.xlim || []).join(",")}" placeholder="0,800"></label>
@@ -1249,7 +1298,7 @@ function materialCardHTML(p, i) {
   html += `<label>只画材料 id（逗号分隔，留空=全部） <input data-f="only_materials" data-i="${i}" value="${((p.only_materials || []).join(","))}" placeholder="4,7"></label>`;
   html += `<label>marker 大小 <input type="number" data-f="marker_size" data-i="${i}" value="${p.marker_size ?? 1}" step="0.5"></label>`;
   html += `<label><input type="checkbox" data-f="fast" data-i="${i}" ${p.fast ? "checked" : ""}> ⚡ 快速渲染（粒子→网格，约 10x 快，出图时建议关）</label>`;
-  html += `<label>横纵比 ${aspectHTML(i, p.aspect)}</label>`;
+  html += aspectHTML(i, p.aspect);
   html += `<label>图例位置
     <select data-f="legend_loc" data-i="${i}">
       ${["best","lower center","upper left","upper right","lower left","lower right","outside right","outside bottom"].map(l => `<option value="${l}" ${(p.legend_loc || "best") === l ? "selected" : ""}>${l}</option>`).join("")}
@@ -1430,16 +1479,18 @@ function advancedHTML(i, p, opts = {}) {
 }
 
 /* 横纵比 HTML（自动/数据等比/自定义数字） */
+/* 横纵比控件：两个并列 label（避免嵌套 label 在紧凑行内布局里溢出） */
 function aspectHTML(i, current) {
   const num = (typeof current === "number" || (typeof current === "string" && current !== "" && !["equal", "data", "1", "auto", "custom"].includes(current)))
     ? current : "";
   const selVal = current === "equal" ? "equal" : (num !== "" ? "custom" : "");
-  return `<select data-f="aspect" data-i="${i}">
+  return `<label>横纵比
+    <select data-f="aspect" data-i="${i}">
       <option value="" ${selVal === "" ? "selected" : ""}>自动</option>
       <option value="equal" ${selVal === "equal" ? "selected" : ""}>数据等比 (x:y 同尺度)</option>
       <option value="custom" ${selVal === "custom" ? "selected" : ""}>自定义…</option>
-    </select>
-    <label id="aspect-num-row-${i}" class="hidden" style="margin-top:4px">自定义数值 (y 相对 x 拉伸倍数)
+    </select></label>
+    <label id="aspect-num-row-${i}" class="hidden">自定义数值 (y 相对 x 拉伸倍数)
       <input type="number" step="0.1" min="0.1" data-f="aspect_num" data-i="${i}" value="${esc(num)}" placeholder="如 3.5">
     </label>`;
 }
@@ -1463,6 +1514,8 @@ function collectSpec() {
     }
     const out = { ...p, file: p.file || (state.fileInfo && state.fileInfo.path) };
     delete out.columns_str;
+    // 全局统一横纵比：面板自身未设置时套用画板级选项
+    if ((out.aspect === undefined || out.aspect === "") && globalAspect() != null) out.aspect = globalAspect();
     if (p.kind === "curve") {
       out.columns = p.columns || (p.columns_str ? p.columns_str.split(",").map(Number) : [0]);
     }
@@ -1483,8 +1536,10 @@ function collectSpec() {
 
 function collectLayout() {
   const layout = {};
-  const rows = parseInt($("#cfg-rows").value, 10);
-  const cols = parseInt($("#cfg-cols").value, 10);
+  // dataset.auto = 自动填充的显示值（不代表用户手动设置）
+  const rowsEl = $("#cfg-rows"), colsEl = $("#cfg-cols");
+  const rows = rowsEl.dataset.auto ? NaN : parseInt(rowsEl.value, 10);
+  const cols = colsEl.dataset.auto ? NaN : parseInt(colsEl.value, 10);
   const hrEl = $("#cfg-height-ratios");
   const wrEl = $("#cfg-width-ratios");
   const hr = hrEl ? hrEl.value.trim() : "";
@@ -1494,6 +1549,39 @@ function collectLayout() {
   if (hr) layout.height_ratios = hr;
   if (wr) layout.width_ratios = wr;
   return Object.keys(layout).length ? layout : undefined;
+}
+
+/* 画板全局统一横纵比（面板自身未设置时生效） */
+function globalAspect() {
+  const sel = $("#cfg-aspect");
+  if (!sel) return null;
+  if (sel.value === "equal") return "equal";
+  if (sel.value === "custom") {
+    const n = parseFloat($("#cfg-aspect-num").value);
+    return isNaN(n) || n <= 0 ? null : n;
+  }
+  return null;
+}
+
+/* Rows/Cols 输入框实时同步当前生效布局（自动模式下灰显填充） */
+function syncLayoutInputs() {
+  const rowsEl = $("#cfg-rows"), colsEl = $("#cfg-cols");
+  if (!rowsEl || !colsEl) return;
+  const n = state.panels.length;
+  const mRows = rowsEl.dataset.auto ? NaN : parseInt(rowsEl.value, 10);
+  const mCols = colsEl.dataset.auto ? NaN : parseInt(colsEl.value, 10);
+  let rows, cols;
+  if (!isNaN(mRows) && mRows > 0 && !isNaN(mCols) && mCols > 0) { rows = mRows; cols = mCols; }
+  else if (!isNaN(mRows) && mRows > 0) { rows = mRows; cols = Math.max(1, Math.ceil(n / rows)); }
+  else if (!isNaN(mCols) && mCols > 0) { cols = mCols; rows = Math.max(1, Math.ceil(n / cols)); }
+  else if (n <= 1) { rows = cols = 1; }
+  else if (n === 2) { rows = 2; cols = 1; }
+  else if (n <= 4) { rows = cols = 2; }
+  else { rows = Math.ceil(n / 2); cols = 2; }
+  if (isNaN(mRows) || mRows <= 0) { rowsEl.value = rows; rowsEl.dataset.auto = "1"; }
+  if (isNaN(mCols) || mCols <= 0) { colsEl.value = cols; colsEl.dataset.auto = "1"; }
+  const now = $("#layout-now");
+  if (now) now.textContent = tr(`当前生效 ${rows}×${cols}`, `Effective ${rows}×${cols}`);
 }
 
 function currentGridDims() {

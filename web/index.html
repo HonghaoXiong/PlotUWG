@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>H5Plot Studio — UW/Badlands h5 检视与 A4 绘图</title>
-<link rel="stylesheet" href="/static/style.css?v=20260822a">
+<link rel="stylesheet" href="/static/style.css?v=20260822b">
 </head>
 <body>
 
@@ -18,7 +18,7 @@
 
 <main>
   <!-- ================= 左：文件浏览器 ================= -->
-  <aside id="file-panel">
+  <aside id="file-panel" style="flex:none">
     <div class="file-nav">
       <input id="path-input" placeholder="输入目录路径…" spellcheck="false">
       <button id="path-pick" title="选择文件夹/文件（原生对话框）">📂</button>
@@ -30,6 +30,7 @@
     <div id="step-bar" class="step-bar hidden"></div>
     <div id="dir-list" class="dir-list"></div>
   </aside>
+  <div class="splitter" id="split-left"></div>
 
   <!-- ================= 中栏（检视/画布）+ 右配置 ================= -->
   <section id="content">
@@ -75,7 +76,8 @@
     </div>
 
     <!-- 右侧配置（常驻） -->
-    <aside id="plot-config" class="plot-config">
+    <div class="splitter" id="split-right"></div>
+    <aside id="plot-config" class="plot-config" style="flex:none">
       <div class="cfg-head"><span>绘图配置</span><button id="cfg-close" class="cfg-close" title="关闭">✕</button></div>
       <div class="cfg-section">
         <h3>画板 (A4)</h3>
@@ -86,6 +88,16 @@
           </select>
         </label>
         <label class="chk"><input type="checkbox" id="cfg-panel-labels" checked> 自动 (a)(b) 面板标注</label>
+        <label>统一横纵比
+          <select id="cfg-aspect">
+            <option value="">各面板自定</option>
+            <option value="equal">数据等比 (x:y 同尺度)</option>
+            <option value="custom">自定义…</option>
+          </select>
+        </label>
+        <label id="cfg-aspect-num-row" class="hidden">自定义数值 (y 相对 x 拉伸)
+          <input type="number" id="cfg-aspect-num" step="0.1" min="0.1" placeholder="如 3.5">
+        </label>
         <label>渲染引擎
           <select id="cfg-engine">
             <option value="matplotlib">matplotlib（质量）</option>
@@ -100,7 +112,8 @@
           <label>行数 rows<input type="number" id="cfg-rows" value="" min="1" max="12" placeholder="自动"></label>
           <label>列数 cols<input type="number" id="cfg-cols" value="" min="1" max="8" placeholder="自动"></label>
         </div>
-        <small style="color:var(--muted)">留空=自动。想要物理等比（如 x 800km : y 160km → 5:1 横条）：在面板「横纵比」里选"数据等比"。</small>
+        <small id="layout-now" style="color:var(--accent);font-weight:600"></small>
+        <small style="color:var(--muted)">灰显数字=自动布局实时值；手动输入即接管，清空恢复自动。物理等比（如 800km:160km→5:1）用「统一横纵比」或面板「横纵比」。</small>
       </div>
 
       <div class="cfg-section">
@@ -158,6 +171,6 @@
 
 <div id="toast"></div>
 
-<script src="/static/app.js?v=20260822a"></script>
+<script src="/static/app.js?v=20260822b"></script>
 </body>
 </html>
