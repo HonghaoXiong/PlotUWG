@@ -374,8 +374,36 @@ def _legend_kw(panel: dict) -> dict:
     if loc == "outside right":
         return dict(bbox_to_anchor=(1.02, 0.5), loc="center left", borderaxespad=0.0)
     if loc == "outside bottom":
+        # 初始锚点；_fix_outside_bottom_legend 会按 xlabel+ticks 实际占位精确下移
         return dict(bbox_to_anchor=(0.5, -0.08), loc="upper center", borderaxespad=0.0)
     return dict(loc=loc)
+
+
+def _fix_outside_bottom_legend(fig, ax) -> None:
+    """外底图例排版：整体放到 xlabel+ticks 占位区之下，不遮挡 x 轴；
+    若超出页面底边则把 axes 上移腾出空间（probe 元信息在修正后记录）。"""
+    leg = ax.get_legend()
+    if leg is None:
+        return
+    fig.canvas.draw()
+    r = fig.canvas.renderer
+    inv = fig.transFigure.inverted()
+    pos = ax.get_position()
+    xb = ax.xaxis.get_tightbbox(r)
+    # 图例顶边需低于 xlabel 底边（xb.y0 = 整个 x 轴占位区的下缘）
+    xzone_bottom = inv.transform((0, xb.y0))[1] if xb is not None else pos.y0 - 0.05
+    lb = leg.get_window_extent(r).transformed(inv)
+    gap = 0.010
+    desired_top = xzone_bottom - gap
+    # loc='upper center' → 锚点=图例顶边中点；换算到 axes 坐标重锚
+    leg.set_bbox_to_anchor((0.5, (desired_top - pos.y0) / max(pos.height, 1e-6)))
+    fig.canvas.draw()
+    lb2 = leg.get_window_extent(r).transformed(inv)
+    deficit = max(0.0, 0.015 - lb2.y0)
+    if deficit > 0:
+        p2 = ax.get_position()
+        ax.set_position([p2.x0, p2.y0 + deficit, p2.width,
+                         max(p2.height - deficit, 0.05)])
 
 
 def _apply_aspect(ax, panel: dict) -> None:
@@ -1237,6 +1265,8 @@ def render_plot(req: dict) -> dict:
         else:
             try:
                 viewer = DRAWS[kind](ax, panel, style)
+                if panel.get("legend_loc") == "outside bottom":
+                    _fix_outside_bottom_legend(fig, ax)
                 if panel.get("title"):
                     ax.set_title(panel["title"], fontsize=style.get("title_size", 8))
                 # 面板标注 (a) (b) ...

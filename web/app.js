@@ -23,6 +23,9 @@ const I18N_EN = {
   "等值线值 (固定值逗号, 或单数字=条数)": "Contour levels (comma, or single number = count)",
   "标注等值线数值": "Label contour values",
   "显示范围 (a,b)": "Value range (a,b)",
+  "colorbar 大小/位置": "Colorbar size/loc",
+  "cb fraction (宽/高占比)": "cb fraction (width/height)",
+  "cb pad (与图间距)": "cb pad (gap)", "cb fraction (宽)": "cb fraction (width)",
   "显示范围 (a,b, 只画区间内)": "Value range (a,b, keep inside)",
   "值下限 (≥)": "Value ≥", "值上限 (≤)": "Value ≤",
   "y 下限 (≥)": "y ≥", "y 上限 (<)": "y <",
@@ -1265,6 +1268,16 @@ function stressCardHTML(p, i) {
   html += `<label>显示范围 (a,b, 只画区间内) <input data-f="mask_range" data-i="${i}" value="${(p.mask_range || []).join(",")}" placeholder="留空=全部"></label>`;
   html += aspectHTML(i, p.aspect);
   html += `<label>colorbar 标签 <input data-f="cbar_label" data-i="${i}" value="${esc(p.cbar_label || "Stress [MPa]")}"></label>`;
+  html += `<details><summary>colorbar 大小/位置</summary>
+    <label>位置 <select data-f="cb_location" data-i="${i}">
+      <option value="" ${!p.cb_location ? "selected" : ""}>right</option>
+      <option value="bottom" ${p.cb_location === "bottom" ? "selected" : ""}>bottom</option>
+      <option value="top" ${p.cb_location === "top" ? "selected" : ""}>top</option>
+      <option value="left" ${p.cb_location === "left" ? "selected" : ""}>left</option>
+    </select></label>
+    <label>cb fraction (宽/高占比) <input type="number" step="0.005" data-f="cb_fraction" data-i="${i}" value="${p.cb_fraction ?? 0.046}"></label>
+    <label>cb pad (与图间距) <input type="number" step="0.005" data-f="cb_pad" data-i="${i}" value="${p.cb_pad ?? 0.04}"></label>
+  </details>`;
   html += `<details><summary>坐标/标签</summary>
     <label>x lim <input data-f="xlim" data-i="${i}" value="${(p.xlim || []).join(",")}" placeholder="0,800"></label>
     <label>y lim <input data-f="ylim" data-i="${i}" value="${(p.ylim || []).join(",")}" placeholder="-150,20"></label>
@@ -1336,11 +1349,16 @@ function materialCardHTML(p, i) {
       html += `<label>y 上限 (<) <input data-act="ov-field" data-ovf="mask_y" data-maskop="lt" data-i="${i}" data-oi="${oi}" value="${(ov.mask_y && ov.mask_y.lt) ?? ""}"></label>
       <label>y 下限 (≥) <input data-act="ov-field" data-ovf="mask_y" data-maskop="ge" data-i="${i}" data-oi="${oi}" value="${(ov.mask_y && ov.mask_y.ge) ?? ""}"></label>`;
       html += `<label><input type="checkbox" data-act="ov-field" data-ovf="cb_bool" data-i="${i}" data-oi="${oi}" ${ov.colorbar ? "checked" : ""}> colorbar</label>`;
+      html += `<label>cb fraction (宽) <input type="number" step="0.005" data-act="ov-field" data-ovf="cb_fraction" data-i="${i}" data-oi="${oi}" value="${ov.cb_fraction ?? ""}"></label>`;
+      html += `<label>cb pad <input type="number" step="0.005" data-act="ov-field" data-ovf="cb_pad" data-i="${i}" data-oi="${oi}" value="${ov.cb_pad ?? ""}"></label>`;
     } else if (ov.type === "field") {
       html += `<label>colormap ${cmapSelectHTML(i, oi, ov.cmap, "viridis")}</label>`;
       html += `<label>alpha <input type="number" step="0.1" data-act="ov-field" data-ovf="alpha" data-i="${i}" data-oi="${oi}" value="${ov.alpha ?? 0.5}"></label>`;
       html += `<label><input type="checkbox" data-act="ov-field" data-ovf="log10_bool" data-i="${i}" data-oi="${oi}" ${ov.log10 ? "checked" : ""}> log10</label>`;
       html += `<label>显示范围 (a,b) <input data-act="ov-field" data-ovf="mask_range_str" data-i="${i}" data-oi="${oi}" value="${(ov.mask_range || []).join(",")}" placeholder="留空=全部"></label>`;
+      html += `<label><input type="checkbox" data-act="ov-field" data-ovf="cb_bool" data-i="${i}" data-oi="${oi}" ${ov.colorbar ? "checked" : ""}> colorbar</label>`;
+      html += `<label>cb fraction (宽) <input type="number" step="0.005" data-act="ov-field" data-ovf="cb_fraction" data-i="${i}" data-oi="${oi}" value="${ov.cb_fraction ?? ""}"></label>`;
+      html += `<label>cb pad <input type="number" step="0.005" data-act="ov-field" data-ovf="cb_pad" data-i="${i}" data-oi="${oi}" value="${ov.cb_pad ?? ""}"></label>`;
     } else if (ov.type === "vectors") {
       html += `<label>文件 <input data-act="ov-field" data-ovf="file" data-i="${i}" data-oi="${oi}" value="${esc(ov.file || "")}" placeholder="…/velocityField-N.h5"></label>`;
       html += `<label>颜色 (hex 或 speed)
