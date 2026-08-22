@@ -1627,6 +1627,8 @@ function aspectHTML(i, current) {
     <select data-f="aspect" data-i="${i}">
       <option value="" ${selVal === "" ? "selected" : ""}>自动</option>
       <option value="equal" ${selVal === "equal" ? "selected" : ""}>数据等比 (x:y 同尺度)</option>
+      <option value="4:3" ${selVal === "4:3" ? "selected" : ""}>4:3</option>
+      <option value="16:9" ${selVal === "16:9" ? "selected" : ""}>16:9</option>
       <option value="custom" ${selVal === "custom" ? "selected" : ""}>自定义…</option>
     </select></label>
     <label id="aspect-num-row-${i}" class="hidden">自定义数值 (y 相对 x 拉伸倍数)
@@ -1699,7 +1701,7 @@ function _tplSpec(t) {
 }
 
 /* 模板画廊（ultraplot 式版式选择器） */
-const TPL_PRESETS = ["1", "1+1", "2+1", "1+2", "2+2", "3+1", "4+1", "3+2"];
+const TPL_PRESETS = ["1", "1+1", "2+1", "1+2", "2+2", "3+1", "4+1", "3+2", "2+2+2+2"];
 function tplGlyph(t) {
   const rowsSpec = _tplSpec(t) || [1];
   return `<span class="tpl-glyph">` + rowsSpec.map((c) =>

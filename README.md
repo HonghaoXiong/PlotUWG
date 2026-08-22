@@ -12,6 +12,10 @@
 - Auto time-step bar: one click to switch any step across all fields
 
 ### 📊 A4 plot studio
+- **Journal-standard defaults measured from the author's published A4 figures**:
+  Arial, ticks 7pt, axis labels 9pt, bold 12pt panel letters, spines 0.6pt,
+  data curves 0.2-0.5pt; aspect presets **data-equal / 4:3 / 16:9** / custom;
+  `2+2+2+2` template for fig3/S4-style multi-row strip layouts
 - **Layout templates (ultraplot-style)**: irregular grids like `2+1` / `4+1` / `3+2`
   (row-1 two columns + row-2 full-width, etc.) via a visual template gallery;
   auto template by panel count; row-height ratios (`3,1`); outside legends &

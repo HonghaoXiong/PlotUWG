@@ -405,6 +405,26 @@ def t_qgis_cmaps():
     assert meta["panels"][0]["kind"] == "field"
 check("QGIS 配色库加载 + 场图渲染", t_qgis_cmaps)
 
+def t_box_ratio_169():
+    # 盒比例预设 16:9 + fig3/S4 式四行两列模板
+    base = {"kind": "field", "file": UW + "/temperature-200.h5",
+            "mesh_file": UW + "/mesh.h5", "cmap": "turbo", "aspect": "16:9",
+            "colorbar": False}
+    meta = P.render_plot({
+        "orientation": "portrait", "style": {},
+        "layout": {"template": "2+2+2+2"},
+        "panels": [dict(base) for _ in range(8)],
+    })
+    assert len(meta["panels"]) == 8 and meta["layout"]["dropped"] == 0
+    p0 = meta["panels"][0]
+    assert abs(p0["w_px"] / p0["h_px"] - 16 / 9) < 0.06
+    # 4:3 单面板
+    meta2 = P.render_plot({"orientation": "portrait", "style": {},
+        "panels": [{**base, "aspect": "4:3"}]})
+    q0 = meta2["panels"][0]
+    assert abs(q0["w_px"] / q0["h_px"] - 4 / 3) < 0.06
+check("盒比例 16:9/4:3 + 四行两列模板", t_box_ratio_169)
+
 print("== 3. probe 点击读数 ==")
 from core import probe
 

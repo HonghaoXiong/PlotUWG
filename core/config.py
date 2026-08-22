@@ -34,15 +34,17 @@ A4 = {
 # --------------------------------------------------------------------------
 # 期刊风格默认样式（用户习惯）
 # --------------------------------------------------------------------------
+# 期刊默认（按用户已发表 Nature 风格 SVG 实测：Arial；ticks 6–8pt；
+# 轴标签 8–10pt；面板标号 ~12–14pt bold；数据曲线 0.2–0.5pt；轴脊 0.5–0.75pt）
 JOURNAL_STYLE = {
     "font_family": "Arial",
-    "font_size": 7,          # 正文 pt
-    "axes_label_size": 8,
-    "title_size": 8,
-    "legend_size": 6.5,
+    "font_size": 7,          # 正文/ticks pt
+    "axes_label_size": 9,
+    "title_size": 9,
+    "legend_size": 7,
     "tick_size": 7,
     "tick_direction": "in",
-    "axes_linewidth": 0.75,
+    "axes_linewidth": 0.6,
     "spines": "thin",        # 隐藏 top/right
     "svg_fonttype": "none",  # 保持 SVG 文本可编辑
     "png_dpi": 300,
@@ -106,7 +108,7 @@ def default_plot_config() -> dict:
         "panel": {
             "gap": 0.55,
             "show_panel_labels": True,
-            "panel_label_size": 10,
+            "panel_label_size": 12,
             "panel_label_weight": "bold",
         },
     }

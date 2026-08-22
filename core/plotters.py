@@ -454,6 +454,24 @@ def _fix_outside_bottom_legend(fig, ax, cell=None) -> None:
     leg.set_bbox_to_anchor((0.5, (desired_top - pos.y0) / max(pos.height, 1e-6)))
 
 
+BOX_RATIOS = {"4:3": 4 / 3, "16:9": 16 / 9}
+
+
+def _apply_box_ratio(ax, cell, ratio: float) -> None:
+    """盒比例预设（4:3 / 16:9）：在网格单元内居中适配出目标物理宽高比的 axes。"""
+    W, H = ax.get_figure().get_size_inches()
+    cw, ch = cell.width * W, cell.height * H   # 物理英寸
+    if cw / ch > ratio:
+        h = ch
+        w = h * ratio
+    else:
+        w = cw
+        h = w / ratio
+    wf, hf = w / W, h / H
+    ax.set_position([cell.x0 + (cell.width - wf) / 2,
+                     cell.y0 + (cell.height - hf) / 2, wf, hf])
+
+
 def _apply_aspect(ax, panel: dict) -> None:
     """面板横纵比：'equal'/数字（y 相对 x 拉伸倍）/'auto'。
 
@@ -1341,6 +1359,9 @@ def render_plot(req: dict) -> dict:
         r_, c0, span = cells[i]
         ax = fig.add_subplot(gs[r_, c0:c0 + span])
         cell = gs[r_, c0:c0 + span].get_position(fig)
+        if panel.get("aspect") in BOX_RATIOS:
+            _apply_box_ratio(ax, cell, BOX_RATIOS[panel.get("aspect")])
+            cell = ax.get_position()   # 图例/colorbar 避让以适配后的盒为准
         kind = panel.get("kind", "field")
         if kind not in DRAWS:
             ax.text(0.5, 0.5, f"unsupported: {kind}", transform=ax.transAxes,
@@ -1466,6 +1487,9 @@ def ensure_hi_res(plot_id: str) -> bool:
         r_, c0, span = cells[i]
         ax = fig.add_subplot(gs[r_, c0:c0 + span])
         cell = gs[r_, c0:c0 + span].get_position(fig)
+        if panel.get("aspect") in BOX_RATIOS:
+            _apply_box_ratio(ax, cell, BOX_RATIOS[panel.get("aspect")])
+            cell = ax.get_position()   # 图例/colorbar 避让以适配后的盒为准
         kind = panel.get("kind", "field")
         n_axes_before = len(fig.axes)
         try:
