@@ -264,6 +264,91 @@ def t_curve():
     assert len(meta["panels"]) == 1
 check("Badlands 曲线 cumdiff", t_curve)
 
+def t_surfaces_modes():
+    # 界面线面板：顶面(每列最高)/底面(每列最低)/全范围散点，列分辨率 60，提取 x 范围
+    meta = P.render_plot({
+        "orientation": "portrait", "style": {},
+        "panels": [{
+            "kind": "surfaces",
+            "file": UW + "/swarm-0.h5", "dataset": "data",
+            "material_file": UW + "/materialField-0.h5",
+            "n_segments": 60, "x_min": 200, "x_max": 600, "legend": True,
+            "lines": [
+                {"mat": 1, "mode": "min", "label": "Topography", "color": "#1f77b4", "lw": 1.6},
+                {"mat": 3, "mode": "max", "label": "Moho", "color": "#d62728", "lw": 1.6},
+                {"mat": 4, "mode": "all", "label": "mat4 scatter", "color": "#ff7f0e",
+                 "size": 1, "alpha": 0.6},
+            ],
+        }],
+    })
+    assert meta["panels"][0]["kind"] == "surfaces"
+    assert meta["panels"][0]["lines"] == 3
+check("界面线：顶/底面按列极值 + 全范围散点（列分辨率 60）", t_surfaces_modes)
+
+def t_field_mask_contour():
+    # 场图：显示范围筛选（区间外留空）+ 固定值等值线列表 + 单数字条数两种写法
+    meta = P.render_plot({
+        "orientation": "portrait", "style": {},
+        "panels": [
+            {"kind": "field", "file": UW + "/temperature-0.h5", "dataset": "data",
+             "mesh_file": UW + "/mesh.h5", "cmap": "turbo",
+             "mask_range": [400, 1000],
+             "contour": True, "contour_levels": [500, 700, 900], "clabel": False},
+            {"kind": "field", "file": UW + "/temperature-0.h5", "dataset": "data",
+             "mesh_file": UW + "/mesh.h5", "cmap": "turbo",
+             "contour": True, "contour_levels": 6, "clabel": False},
+        ],
+    })
+    assert len(meta["panels"]) == 2
+check("场图显示范围筛选 + 固定值等值线（列表/条数）", t_field_mask_contour)
+
+def t_stress_mask():
+    # 应力场（单元中心）：显示范围筛选只画区间内单元 + 应力等值线叠加（单元中心网格）
+    meta = P.render_plot({
+        "orientation": "portrait", "style": {},
+        "panels": [{
+            "kind": "material",
+            "file": UW + "/swarm-0.h5", "dataset": "data",
+            "material_file": UW + "/materialField-0.h5", "legend": False,
+            "overlays": [
+                {"type": "contour", "file": UW + "/projStressTensor-0.h5",
+                 "dataset": "data", "mesh_file": UW + "/mesh.h5",
+                 "levels": [-4, 0, 4], "color": "#00E5FF", "clabel": False,
+                 "linewidth": 1.0, "linestyle": "-"},
+            ],
+        }, {
+            "kind": "stress",
+            "file": UW + "/projStressTensor-0.h5", "dataset": "data",
+            "mesh_file": UW + "/mesh.h5", "column": 1, "cmap": "RdBu_r",
+            "vmin": -8, "vmax": 8, "mask_range": [-2, 2],
+        }],
+    })
+    assert len(meta["panels"]) == 2
+    assert meta["panels"][0]["overlays"]["contour"] == 1
+check("应力场显示范围筛选 + 任意场等值线（单元中心）", t_stress_mask)
+
+def t_overlay_scatter_two_sided():
+    # 应变散点双向阈值（值上下限 + y 上下限）+ 场叠加显示范围筛选（原始物理量）
+    meta = P.render_plot({
+        "orientation": "portrait", "style": {},
+        "panels": [{
+            "kind": "material",
+            "file": UW + "/swarm-0.h5", "dataset": "data",
+            "material_file": UW + "/materialField-0.h5", "legend": False,
+            "overlays": [
+                {"type": "scatter", "file": UW + "/plasticStrain-0.h5", "dataset": "data",
+                 "cmap": "hot_r", "mask_value": {"ge": 1.0, "le": 3.0},
+                 "mask_y": {"ge": -60, "lt": 0}},
+                {"type": "field", "file": UW + "/projViscosityField-0.h5", "dataset": "data",
+                 "mesh_file": UW + "/mesh.h5", "cmap": "viridis", "alpha": 0.4,
+                 "log10": True, "column": 0, "mask_range": [1e20, 1e23]},
+            ],
+        }],
+    })
+    assert meta["panels"][0]["overlays"]["scatter"] == 1
+    assert meta["panels"][0]["overlays"]["field"] == 1
+check("应变散点双向阈值 + 场叠加显示范围筛选", t_overlay_scatter_two_sided)
+
 print("== 3. probe 点击读数 ==")
 from core import probe
 

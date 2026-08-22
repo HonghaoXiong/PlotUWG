@@ -503,12 +503,19 @@ def draw_field(ax, panel: dict, style: dict) -> dict:
         Z = vals[: nx * ny].reshape(ny, nx)
         X = np.arange(nx + 1) + 0.5 - 0.5
         Y = np.arange(ny + 1) + 0.5 - 0.5
+    # 显示范围筛选（类比物质场阈值提取）：区间外的值 → NaN（pcolormesh 留空）
+    mr = panel.get("mask_range") or []
+    if len(mr) == 2:
+        lo, hi = sorted((float(mr[0]), float(mr[1])))
+        Z = np.where((Z >= lo) & (Z <= hi), Z, np.nan)
     cmap = _resolve_cmap(panel)
     pc = ax.pcolormesh(X, Y, Z, cmap=cmap, shading="auto",
                        vmin=panel.get("vmin"), vmax=panel.get("vmax"),
                        rasterized=True)
     if panel.get("contour"):
         lv = panel.get("contour_levels") or 8
+        if isinstance(lv, list) and len(lv) == 1:
+            lv = int(lv[0]) if float(lv[0]).is_integer() and lv[0] > 1 else lv
         cs = ax.contour(X, Y, Z, levels=lv, colors=panel.get("contour_color", "#333333"),
                         linewidths=0.5)
         if panel.get("clabel", True):
@@ -645,7 +652,14 @@ def _extract_surface(xy: np.ndarray, mat: np.ndarray, mat_id: int,
 
 
 def draw_surfaces(ax, panel: dict, style: dict) -> dict:
-    """材料界面线面板：地形/沉积底面/莫霍面等多线曲线（segment_extreme 算法）。"""
+    """物质场顶/底面提取面板：任选材料 index，三种模式。
+
+    每条 line：{mat, mode, label, color, lw/ls 或 size/alpha}
+      mode='max' -> 顶面：按列(分段)取该材料散点每列最高点连成线（如 Moho=地幔顶）
+      mode='min' -> 底面：按列取每列最低点连成线（如 地形=空气底、沉积底面）
+      mode='all' -> 散点：该材料整个范围的粒子分布（不做极值提取）
+    列分辨率 = n_segments（分段数）；提取 x 范围 = x_min/x_max（缺省为全域）。
+    """
     fn = panel["file"]
     mfile = panel.get("material_file") or fn
     xy, mat, _ = _subsample_with_cache(fn, mfile if mfile and Path(mfile).exists() else None)
@@ -663,13 +677,28 @@ def draw_surfaces(ax, panel: dict, style: dict) -> dict:
     ]
     drawn = 0
     for i, lc in enumerate(lines):
-        xs, ys = _extract_surface(xy, mat, lc.get("mat", 1), lc.get("mode", "min"),
+        mode = str(lc.get("mode", "min"))
+        color = lc.get("color", default_colors[i % len(default_colors)])
+        label = lc.get("label", f"mat {lc.get('mat')}")
+        if mode == "all":
+            # 整个范围散点分布：该材料全部（下采样后的）粒子
+            pts = xy[mat == int(lc.get("mat", 1))]
+            pts = pts[(pts[:, 0] >= x_min) & (pts[:, 0] <= x_max)]
+            if len(pts) == 0:
+                continue
+            ax.scatter(pts[:, 0], pts[:, 1], s=float(lc.get("size", 1)),
+                       c=color, alpha=float(lc.get("alpha", 0.8)),
+                       rasterized=True, edgecolors="none",
+                       antialiased=False, label=label)
+            drawn += 1
+            continue
+        xs, ys = _extract_surface(xy, mat, lc.get("mat", 1), mode,
                                   n_seg, x_min, x_max)
         if len(xs) == 0:
             continue
-        ax.plot(xs, ys, color=lc.get("color", default_colors[i % len(default_colors)]),
+        ax.plot(xs, ys, color=color,
                 lw=float(lc.get("lw", style.get("line_width", 1.2))),
-                ls=lc.get("ls", "-"), label=lc.get("label", f"mat {lc.get('mat')}"))
+                ls=lc.get("ls", "-"), label=label)
         drawn += 1
     if panel.get("legend", True) and drawn:
         ax.legend(fontsize=style.get("legend_size", 6.5), frameon=False,
@@ -870,7 +899,12 @@ def _overlay_contour(ax, ov: dict, ofile: str, style: dict) -> None:
     verts, geo = _mesh_geometry(mesh_file)
     X, Y, _ = _field_grid(verts, geo)
     if vals.size != X.size:
-        raise ValueError(f"{ofile} 节点数 {vals.size} 与网格 {X.size} 不匹配")
+        if vals.size == (X.shape[0] - 1) * (X.shape[1] - 1):
+            # 单元中心数据（如 projStressTensor）：节点网格 → 单元中心网格
+            X = 0.5 * (X[:-1, :-1] + X[1:, 1:])
+            Y = 0.5 * (Y[:-1, :-1] + Y[1:, 1:])
+        else:
+            raise ValueError(f"{ofile} 节点数 {vals.size} 与网格 {X.size} 不匹配")
     Z = vals.reshape(X.shape)
     levels = ov.get("levels") or [473, 673, 873, 1073, 1273, 1473]
     color = ov.get("color", "#ff557f")
@@ -962,6 +996,11 @@ def _overlay_field(ax, ov: dict, ofile: str, style: dict) -> None:
         Z = vals.reshape(X.shape)
     else:
         raise ValueError("叠加场节点数与网格不匹配")
+    # 显示范围筛选（按原始物理量区间；log10 前生效）：区间外 → NaN 留空
+    mr = ov.get("mask_range") or []
+    if len(mr) == 2:
+        lo, hi = sorted((float(mr[0]), float(mr[1])))
+        Z = np.where((Z >= lo) & (Z <= hi), Z, np.nan)
     vmin, vmax = ov.get("vmin"), ov.get("vmax")
     if ov.get("log10"):
         Z = np.log10(np.clip(Z, 1e-30, None))
@@ -1022,6 +1061,12 @@ def draw_stress(ax, panel: dict, style: dict) -> dict:
     centers = verts[en].mean(axis=1)
     col = min(int(panel.get("column", 1)), data.shape[1] - 1)
     vals = data[:, col]
+    # 显示范围筛选：只保留区间内的单元（区间外不绘制）
+    mr = panel.get("mask_range") or []
+    if len(mr) == 2:
+        lo, hi = sorted((float(mr[0]), float(mr[1])))
+        keep = (vals >= lo) & (vals <= hi)
+        vals, centers = vals[keep], centers[keep]
     vmin = panel.get("vmin")
     vmax = panel.get("vmax")
     if vmin is None and vmax is None:
@@ -1104,9 +1149,16 @@ def _ratios(v: object, n: int) -> list:
 
 
 def _spec_cache_key(req: dict) -> str:
-    """渲染 spec + 相关文件 mtime 的指纹；相同请求直接复用产物（秒回）。"""
-    import hashlib
+    """渲染 spec + 相关文件 mtime + 代码版本的指纹；相同请求直接复用产物（秒回）。"""
+    import hashlib, sys
     h = hashlib.sha1()
+    # 代码版本指纹：plotters/config 源码改动后旧缓存自动失效
+    for mod in ("core.plotters", "core.config"):
+        try:
+            mf = Path(sys.modules[mod].__file__)
+            h.update(f"{mf}:{os.path.getmtime(mf)}".encode())
+        except Exception:  # noqa: BLE001
+            pass
     h.update(json.dumps(req, sort_keys=True, ensure_ascii=False).encode("utf-8"))
     for p in req.get("panels") or []:
         for k in ("file", "material_file", "mesh_file"):

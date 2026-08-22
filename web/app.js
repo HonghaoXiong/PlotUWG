@@ -17,6 +17,15 @@ const I18N_EN = {
   // 面板与类型
   "物质场": "Material", "场图": "Field", "粒子图": "Swarm", "曲线": "Curve",
   "搜索": "Search", "场叠加": "Field overlay", "温度等值线": "Temp contours",
+  "等值线": "Contours", "+等值线 (任意场)": "+ Contours (any field)",
+  "场文件 (任意 mesh 场)": "Field file (any mesh field)",
+  "等值线值 (固定值,逗号)": "Contour levels (fixed, comma)",
+  "等值线值 (固定值逗号, 或单数字=条数)": "Contour levels (comma, or single number = count)",
+  "标注等值线数值": "Label contour values",
+  "显示范围 (a,b)": "Value range (a,b)",
+  "显示范围 (a,b, 只画区间内)": "Value range (a,b, keep inside)",
+  "值下限 (≥)": "Value ≥", "值上限 (≤)": "Value ≤",
+  "y 下限 (≥)": "y ≥", "y 上限 (<)": "y <",
   "应变散点": "Strain points", "速度矢量": "Velocity vectors", "追踪点": "Tracers",
   "内置预设": "Presets", "连续色板": "Sequential", "面板": "Panels",
   "画板 (A4)": "Canvas (A4)", "方向": "Orientation", "排版 · 行列": "Layout · Grid",
@@ -48,6 +57,17 @@ const I18N_EN = {
   "🗂 模型目录 · 时间自动对齐": "Model dir · time auto-align",
   "＋ 物质场图 (Qaidam)": "+ Material (Qaidam)", "＋ 综合物质场图 (全叠加)": "+ Full overlay",
   "＋ 多时间步四连图…": "+ Multi-step grid...",
+  "＋ 界面线 (Topo/Moho/Sed)": "+ Interfaces (Topo/Moho/Sed)",
+  "＋ 应力场 (σyy)": "+ Stress field (σyy)",
+  "界面线": "Interfaces", "+ 界面线": "+ Interface line",
+  "列数 (列分辨率)": "Columns (resolution)",
+  "提取 x 范围 (a,b, 留空=全部)": "Extract x range (a,b, empty=all)",
+  "顶 = 每列最高点连线；底 = 每列最低点连线；散点 = 该材料整个范围的粒子分布":
+    "top = max y per column; bottom = min y per column; scatter = all particles of the material",
+  "材料 id": "Material id", "取": "Mode", "标签": "Label", "点大小": "Point size",
+  "顶面 top (每列最高)": "Top (max per col)",
+  "底面 bottom (每列最低)": "Bottom (min per col)",
+  "散点 all (全分布)": "Scatter (all)",
   // 面板卡片
   "快速渲染（粒子→网格，约 10x 快，出图时建议关）": "Fast render (particles→grid, ~10x faster)",
   "材料图例": "Material legend", "材料配色": "Material palette", "背景色": "Background",
@@ -396,7 +416,7 @@ function renderStepBar(scan) {
   btnS.className = "sb-btn";
   btnS.style.background = "linear-gradient(180deg,#8ab4f8,#4285f4)";
   btnS.textContent = "＋ 界面线 (Topo/Moho/Sed)";
-  btnS.title = "Extract material interface lines (topography / sediment base / Moho)";
+  btnS.title = "选物质场 index：顶面/底面（按列极值连线，列分辨率可调）或全范围散点";
   btnS.onclick = () => generateSurfacesPanel(parseInt(sel.value, 10), dir);
   const btnSt = document.createElement("button");
   btnSt.className = "sb-btn";
@@ -530,7 +550,7 @@ function generateSurfacesPanel(step, dir) {
     ],
   });
   switchTab("plot");
-  toast(tr("已添加界面线面板（Topography / Sed base / Moho）", "Surfaces panel added (Topography / Sed base / Moho)"));
+  toast(tr("已添加界面线面板（顶/底面按列极值连线，可切换散点模式、调列分辨率）", "Surfaces panel added (top/bottom per-column extremes; scatter mode & column resolution available)"));
 }
 
 function generateStressPanel(step, dir) {
@@ -855,13 +875,16 @@ function renderPanels() {
         <label>列<select data-f="column" data-i="${i}"><option value="0">0</option><option value="1">1</option><option value="2">2</option></select></label>
         <label class="cmap-row">色板 <div class="cmap-row2"><select data-f="cmap" data-i="${i}"></select><span class="cmap-preview" id="cmap-prev-p-${i}" style="background:linear-gradient(90deg,#2878B5,#D97924)"></span></div></label>
         <label><input type="checkbox" data-f="colorbar" data-i="${i}" checked> colorbar</label>
-        <label><input type="checkbox" data-f="contour" data-i="${i}"> 等值线 contour</label>
+        <label><input type="checkbox" data-f="contour" data-i="${i}" ${p.contour ? "checked" : ""}> 等值线 contour</label>
+        <label>等值线值 (固定值逗号, 或单数字=条数)
+          <input data-f="contour_levels" data-i="${i}" value="${Array.isArray(p.contour_levels) ? p.contour_levels.join(",") : (p.contour_levels ?? "")}" placeholder="如 473,673,873 或 8"></label>
         <details><summary>更多选项</summary>
           <label>xlabel <input data-f="xlabel" data-i="${i}" value="${esc(p.xlabel || "")}"></label>
           <label>ylabel <input data-f="ylabel" data-i="${i}" value="${esc(p.ylabel || "")}"></label>
           <label>横纵比 ${aspectHTML(i, p.aspect)}</label>
           <label>xlim (a,b) <input data-f="xlim" data-i="${i}" value="${(p.xlim || []).join(",")}" placeholder="0,800"></label>
           <label>ylim (a,b) <input data-f="ylim" data-i="${i}" value="${(p.ylim || []).join(",")}" placeholder="-160,10"></label>
+          <label>显示范围 (a,b, 只画区间内) <input data-f="mask_range" data-i="${i}" value="${(p.mask_range || []).join(",")}" placeholder="留空=全部"></label>
           ${advancedHTML(i, p, { vmin: true, cb: true })}
         </details>`;
     } else if (p.kind === "swarm") {
@@ -944,6 +967,26 @@ function renderPanels() {
       if (["vmin", "vmax", "cb_fraction", "cb_pad"].includes(f)) v = v === "" ? null : parseFloat(v);
       if (f === "columns_str") p.columns = v.split(",").map(Number);
       if (f === "only_materials") v = v.trim() ? v.split(",").map((s) => parseInt(s.trim(), 10)) : [];
+      if (f === "contour_levels") {
+        // 等值线：逗号分隔固定值列表；单个整数 = 自动条数
+        const nums = String(v).split(",").map((s) => parseFloat(s.trim())).filter((n) => !isNaN(n));
+        if (!nums.length) delete p.contour_levels;
+        else p.contour_levels = (nums.length === 1 && Number.isInteger(nums[0]) && nums[0] > 1) ? nums[0] : nums;
+        savePanels(); scheduleAutoRender(); return;
+      }
+      if (f === "mask_range") {
+        // 显示范围（类比阈值提取）：只绘制区间内的值，其余留空
+        const nums = String(v).split(",").map((s) => parseFloat(s.trim())).filter((n) => !isNaN(n));
+        p.mask_range = nums.length === 2 ? [nums[0], nums[1]] : null;
+        savePanels(); scheduleAutoRender(); return;
+      }
+      if (f === "x_range") {
+        // 界面线提取 x 范围（留空 = 全域）
+        const nums = String(v).split(",").map((s) => parseFloat(s.trim())).filter((n) => !isNaN(n));
+        if (nums.length === 2) { p.x_min = nums[0]; p.x_max = nums[1]; }
+        else { delete p.x_min; delete p.x_max; }
+        savePanels(); scheduleAutoRender(); return;
+      }
       if (f === "colorbar" || f === "contour" || f === "legend") v = e.target.checked;
       if (f === "columns_str") return;
       if (f === "cmap") {
@@ -1054,8 +1097,13 @@ function renderPanels() {
       const ln = p.lines[+e.target.dataset.oi];
       if (!ln) return;
       const k = e.target.dataset.srf;
-      ln[k] = k === "mat" ? parseInt(e.target.value, 10) : e.target.value;
-      savePanels(); scheduleAutoRender();
+      let v = e.target.value;
+      if (k === "mat") v = parseInt(v, 10);
+      else if (["size", "alpha", "lw"].includes(k)) v = v === "" ? null : parseFloat(v);
+      ln[k] = v;
+      savePanels();
+      if (k === "mode") renderPanels();   // 顶/底 ↔ 散点：刷新卡片输入项（线宽/点大小）
+      else scheduleAutoRender();
     });
   });
   $$("#panel-list [data-act=ov-del]").forEach((btn) => {
@@ -1073,9 +1121,20 @@ function renderPanels() {
       const key = e.target.dataset.ovf;
       let v = e.target.type === "checkbox" ? e.target.checked : e.target.value;
       if (key === "levels") v = v.split(",").map(Number);
-      if (["vmin", "vmax", "alpha", "size", "stride", "scale", "width", "key_uv", "cb_fraction", "cb_pad"].includes(key)) v = v === "" ? null : parseFloat(v);
-      if (key === "mask_y") v = v.trim() ? { [e.target.dataset.maskop]: parseFloat(v) } : {};
-      if (key === "mask_v") v = v.trim() ? { [e.target.dataset.maskop]: parseFloat(v) } : {};
+      if (["vmin", "vmax", "alpha", "size", "stride", "scale", "width", "key_uv", "cb_fraction", "cb_pad", "linewidth"].includes(key)) v = v === "" ? null : parseFloat(v);
+      if (key === "mask_y" || key === "mask_v") {
+        // 上下限合并：编辑一个阈值不清除另一个（只替换对应操作符）
+        const cur = { ...((key === "mask_y" ? ov.mask_y : ov.mask_value) || {}) };
+        if (String(v).trim()) cur[e.target.dataset.maskop] = parseFloat(v);
+        else delete cur[e.target.dataset.maskop];
+        if (key === "mask_y") ov.mask_y = cur; else ov.mask_value = cur;
+        scheduleAutoRender(); return;
+      }
+      if (key === "mask_range_str") {
+        const nums = String(v).split(",").map((s) => parseFloat(s.trim())).filter((n) => !isNaN(n));
+        ov.mask_range = nums.length === 2 ? [nums[0], nums[1]] : null;
+        scheduleAutoRender(); return;
+      }
       if (key === "cmap") {
         if (PRESET_CMAPS[v]) { ov.cmap_values = PRESET_CMAPS[v]; ov.cmap = v; }
         else { ov.cmap = v; delete ov.cmap_values; }
@@ -1102,18 +1161,33 @@ function surfacesCardHTML(p, i) {
   let html = `<h4><span class="tag">界面线</span> 面板 ${i + 1} · ${posTag}
      <button class="panel-del" data-i="${i}" title="删除">✕</button></h4>`;
   html += `<label>swarm <small>${esc((p.file || "").split("/").pop())}</small></label>`;
-  html += `<label>分段数 <input type="number" data-f="n_segments" data-i="${i}" value="${p.n_segments ?? 100}"></label>`;
+  html += `<label>列数 (列分辨率) <input type="number" min="2" data-f="n_segments" data-i="${i}" value="${p.n_segments ?? 100}"></label>`;
+  html += `<label>提取 x 范围 (a,b, 留空=全部) <input data-f="x_range" data-i="${i}" value="${(p.x_min != null && p.x_max != null) ? `${p.x_min},${p.x_max}` : ""}" placeholder="如 0,800"></label>`;
+  html += `<small class="hint">顶 = 每列最高点连线；底 = 每列最低点连线；散点 = 该材料整个范围的粒子分布</small>`;
   (p.lines || []).forEach((ln, li) => {
+    const isAll = ln.mode === "all";
+    const extra = isAll
+      ? `<label>点大小 <input type="number" step="0.5" min="0.5" data-act="srf-field" data-srf="size" data-i="${i}" data-oi="${li}" value="${ln.size ?? 1}"></label>
+         <label>alpha <input type="number" step="0.1" min="0" max="1" data-act="srf-field" data-srf="alpha" data-i="${i}" data-oi="${li}" value="${ln.alpha ?? 0.8}"></label>`
+      : `<label>线宽 <input type="number" step="0.1" min="0.1" data-act="srf-field" data-srf="lw" data-i="${i}" data-oi="${li}" value="${ln.lw ?? 1.4}"></label>
+         <label>线型 <select data-act="srf-field" data-srf="ls" data-i="${i}" data-oi="${li}">
+           <option value="-" ${(ln.ls || "-") === "-" ? "selected" : ""}>实线 -</option>
+           <option value="--" ${ln.ls === "--" ? "selected" : ""}>虚线 --</option>
+           <option value=":" ${ln.ls === ":" ? "selected" : ""}>点线 :</option>
+           <option value="-." ${ln.ls === "-." ? "selected" : ""}>点划 -.</option>
+         </select></label>`;
     html += `<div class="ov-row">
       <span class="ov-tag">line ${li + 1}</span>
       <button class="ov-del" data-act="srf-del" data-i="${i}" data-oi="${li}" title="删除">✕</button>
       <label>材料 id <input type="number" data-act="srf-field" data-srf="mat" data-i="${i}" data-oi="${li}" value="${ln.mat ?? 1}"></label>
       <label>取 <select data-act="srf-field" data-srf="mode" data-i="${i}" data-oi="${li}">
-        <option value="min" ${ln.mode === "min" ? "selected" : ""}>顶面 (min y)</option>
-        <option value="max" ${ln.mode === "max" ? "selected" : ""}>底面 (max y)</option>
+        <option value="max" ${ln.mode === "max" ? "selected" : ""}>顶面 top (每列最高)</option>
+        <option value="min" ${ln.mode === "min" ? "selected" : ""}>底面 bottom (每列最低)</option>
+        <option value="all" ${ln.mode === "all" ? "selected" : ""}>散点 all (全分布)</option>
       </select></label>
       <label>标签 <input data-act="srf-field" data-srf="label" data-i="${i}" data-oi="${li}" value="${esc(ln.label || "")}"></label>
       <label>颜色 <input type="color" data-act="srf-field" data-srf="color" data-i="${i}" data-oi="${li}" value="${(ln.color || "#1f77b4")}"></label>
+      ${extra}
     </div>`;
   });
   html += `<div class="btn-row"><button class="mini" data-act="srf-add" data-i="${i}">+ 界面线</button></div>`;
@@ -1140,6 +1214,7 @@ function stressCardHTML(p, i) {
   </select><span class="cmap-preview" id="cmap-prev-p-${i}"></span></div></label>`;
   html += `<label>vmin <input type="number" step="any" data-f="vmin" data-i="${i}" value="${p.vmin ?? -8}"></label>`;
   html += `<label>vmax <input type="number" step="any" data-f="vmax" data-i="${i}" value="${p.vmax ?? 8}"></label>`;
+  html += `<label>显示范围 (a,b, 只画区间内) <input data-f="mask_range" data-i="${i}" value="${(p.mask_range || []).join(",")}" placeholder="留空=全部"></label>`;
   html += `<label>colorbar 标签 <input data-f="cbar_label" data-i="${i}" value="${esc(p.cbar_label || "Stress [MPa]")}"></label>`;
   html += `<details><summary>坐标/标签</summary>
     <label>x lim <input data-f="xlim" data-i="${i}" value="${(p.xlim || []).join(",")}" placeholder="0,800"></label>
@@ -1184,27 +1259,39 @@ function materialCardHTML(p, i) {
   html += `<div class="ovs">`;
   (p.overlays || []).forEach((ov, oi) => {
     const ovName = (ov.file || "").split("/").pop() || ov.ov_type || ov.type;
-    const cnt = { contour: "温度等值线", scatter: "应变散点", field: "场叠加",
+    const cnt = { contour: "等值线", scatter: "应变散点", field: "场叠加",
                   vectors: "速度矢量", tracers: "追踪点" }[ov.type] || ov.type;
     html += `<div class="ov-row">
       <span class="ov-tag">${cnt}</span> <small>${esc(ovName)}</small>
       <button class="ov-del" data-act="ov-del" data-i="${i}" data-oi="${oi}" title="删除">✕</button>
       <details open><summary>参数</summary>`;
     if (ov.type === "contour") {
-      html += `<label>levels (K,逗号) <input data-act="ov-field" data-ovf="levels" data-i="${i}" data-oi="${oi}" value="${(ov.levels || []).join(",")}"></label>`;
+      html += `<label>场文件 (任意 mesh 场) <input data-act="ov-field" data-ovf="file" data-i="${i}" data-oi="${oi}" value="${esc(ov.file || "")}" placeholder="…/temperature-N.h5"></label>`;
+      html += `<label>dataset <input data-act="ov-field" data-ovf="dataset" data-i="${i}" data-oi="${oi}" value="${esc(ov.dataset || "data")}"></label>`;
+      html += `<label>等值线值 (固定值,逗号) <input data-act="ov-field" data-ovf="levels" data-i="${i}" data-oi="${oi}" value="${(ov.levels || []).join(",")}" placeholder="如 473,673,873"></label>`;
       html += `<label>颜色 <input type="color" data-act="ov-field" data-ovf="color" data-i="${i}" data-oi="${oi}" value="${(ov.color && ov.color.startsWith("#")) ? ov.color : "#ff557f"}" class="color-input"></label>`;
-      html += `<label><input type="checkbox" data-act="ov-field" data-ovf="clabel_bool" data-i="${i}" data-oi="${oi}" ${ov.clabel === false ? "" : "checked"}> 标注温度</label>`;
+      html += `<label>线宽 <input type="number" step="0.1" min="0.1" data-act="ov-field" data-ovf="linewidth" data-i="${i}" data-oi="${oi}" value="${ov.linewidth ?? 0.8}"></label>`;
+      html += `<label>线型 <select data-act="ov-field" data-ovf="linestyle" data-i="${i}" data-oi="${oi}">
+        <option value="--" ${(ov.linestyle || "--") === "--" ? "selected" : ""}>虚线 --</option>
+        <option value="-" ${ov.linestyle === "-" ? "selected" : ""}>实线 -</option>
+        <option value=":" ${ov.linestyle === ":" ? "selected" : ""}>点线 :</option>
+        <option value="-." ${ov.linestyle === "-." ? "selected" : ""}>点划 -.</option>
+      </select></label>`;
+      html += `<label><input type="checkbox" data-act="ov-field" data-ovf="clabel_bool" data-i="${i}" data-oi="${oi}" ${ov.clabel === false ? "" : "checked"}> 标注等值线数值</label>`;
     } else if (ov.type === "scatter") {
       html += `<label>colormap ${cmapSelectHTML(i, oi, ov.cmap, "hot_r")}</label>`;
       html += `<label>vmin <input type="number" data-act="ov-field" data-ovf="vmin" data-i="${i}" data-oi="${oi}" value="${ov.vmin ?? ""}"></label>`;
       html += `<label>vmax <input type="number" data-act="ov-field" data-ovf="vmax" data-i="${i}" data-oi="${oi}" value="${ov.vmax ?? ""}"></label>`;
-      html += `<label>值阈值 (≥) <input data-act="ov-field" data-ovf="mask_v" data-maskop="ge" data-i="${i}" data-oi="${oi}" value="${(ov.mask_value && ov.mask_value.ge) ?? ""}"></label>`;
-      html += `<label>y 上限 (<) <input data-act="ov-field" data-ovf="mask_y" data-maskop="lt" data-i="${i}" data-oi="${oi}" value="${(ov.mask_y && ov.mask_y.lt) ?? ""}"></label>`;
+      html += `<label>值下限 (≥) <input data-act="ov-field" data-ovf="mask_v" data-maskop="ge" data-i="${i}" data-oi="${oi}" value="${(ov.mask_value && ov.mask_value.ge) ?? ""}"></label>`;
+      html += `<label>值上限 (≤) <input data-act="ov-field" data-ovf="mask_v" data-maskop="le" data-i="${i}" data-oi="${oi}" value="${(ov.mask_value && ov.mask_value.le) ?? ""}"></label>`;
+      html += `<label>y 上限 (<) <input data-act="ov-field" data-ovf="mask_y" data-maskop="lt" data-i="${i}" data-oi="${oi}" value="${(ov.mask_y && ov.mask_y.lt) ?? ""}"></label>
+      <label>y 下限 (≥) <input data-act="ov-field" data-ovf="mask_y" data-maskop="ge" data-i="${i}" data-oi="${oi}" value="${(ov.mask_y && ov.mask_y.ge) ?? ""}"></label>`;
       html += `<label><input type="checkbox" data-act="ov-field" data-ovf="cb_bool" data-i="${i}" data-oi="${oi}" ${ov.colorbar ? "checked" : ""}> colorbar</label>`;
     } else if (ov.type === "field") {
       html += `<label>colormap ${cmapSelectHTML(i, oi, ov.cmap, "viridis")}</label>`;
       html += `<label>alpha <input type="number" step="0.1" data-act="ov-field" data-ovf="alpha" data-i="${i}" data-oi="${oi}" value="${ov.alpha ?? 0.5}"></label>`;
       html += `<label><input type="checkbox" data-act="ov-field" data-ovf="log10_bool" data-i="${i}" data-oi="${oi}" ${ov.log10 ? "checked" : ""}> log10</label>`;
+      html += `<label>显示范围 (a,b) <input data-act="ov-field" data-ovf="mask_range_str" data-i="${i}" data-oi="${oi}" value="${(ov.mask_range || []).join(",")}" placeholder="留空=全部"></label>`;
     } else if (ov.type === "vectors") {
       html += `<label>文件 <input data-act="ov-field" data-ovf="file" data-i="${i}" data-oi="${oi}" value="${esc(ov.file || "")}" placeholder="…/velocityField-N.h5"></label>`;
       html += `<label>颜色 (hex 或 speed)
@@ -1229,7 +1316,7 @@ function materialCardHTML(p, i) {
   });
   html += `</div>`;
   html += `<div class="btn-row">
-    <button class="mini" data-act="ov-add" data-ov="contour" data-i="${i}">+温度等值线</button>
+    <button class="mini" data-act="ov-add" data-ov="contour" data-i="${i}">+等值线 (任意场)</button>
     <button class="mini" data-act="ov-add" data-ov="scatter" data-i="${i}">+应变散点</button>
     <button class="mini" data-act="ov-add" data-ov="vectors" data-i="${i}">+速度矢量</button>
     <button class="mini" data-act="ov-add" data-ov="tracers" data-i="${i}">+追踪点</button>

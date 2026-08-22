@@ -13,13 +13,21 @@
 
 ### 📊 A4 plot studio
 - **Material field** base layer (swarm + materialField) with the **Qaidam palette** (Air / Sed / Lithospheric Mantle / Qaidam UC-MC-LC / Orogen UC-MC-LC, matched to the paper convention)
-- **Interface lines panel** (topography / sediment base / Moho): segment-extreme
-  extraction from material particles (same algorithm as the author's TopoField /
-  Moho scripts), multi-line with per-line material/mode/color
+- **Interface lines panel** — pick any material index and draw its **top surface**
+  (per-column max y), **bottom surface** (per-column min y) or the **full scatter
+  distribution** of that material; column resolution (bin count) and extraction
+  x-range adjustable; multi-line with per-line material/mode/label/color/linestyle
+  (defaults: Topography = air bottom, Sed base = sediment bottom, Moho = mantle top)
 - **Stress field panel**: σxx/σyy/σxy on element centers (projStressTensor + mesh
   en_map), diverging RdBu colormap with symmetric vmin/vmax
+- **Value-range filtering on any field** (like the material threshold extraction):
+  field / stress / field-overlay panels accept a display range (a,b); values outside
+  the interval are left blank. Scatter overlays accept two-sided value & y thresholds.
+- **Fixed-value contours on any field**: field panels and contour overlays accept an
+  explicit level list (e.g. `473,673,873`) drawn across the whole coordinate range
+  (also works on element-centered fields like projStressTensor).
 - **Overlays** (any combination, auto-detected when present):
-  - Temperature contours (K, ℃ labels, label region picker)
+  - Contours of any mesh field (temperature by default; ℃/K labels, label region picker)
   - Plastic strain threshold scatter (e.g. ≥1.5 & y<4)
   - Velocity vectors (quiver: stride / color / scale / reference arrow)
   - Passive tracers (`gridN-*.h5`, multi-file, multi-color)
@@ -42,7 +50,7 @@
   [plotkit](https://github.com/anonymousAAK/plotrs) library (patched with a `quiver`
   vector-field artist). Full 200k-point material figure at A4 300dpi in ~0.9s vs
   ~2.2s matplotlib. Switch in Canvas settings: `Render engine = Rust plotkit`.
-- Render result cache (same spec → instant), subsampling disk cache
+- Render result cache (same spec → instant, auto-invalidated on code changes), subsampling disk cache
 - **Auto re-render** on parameter change (~650ms debounce)
 - Native macOS window (pywebview/WKWebView), starts in <1s
 
