@@ -955,3 +955,6 @@ input[data-auto] { color: var(--muted) !important; }
 /* 窄侧栏时 colormap 行换行而非溢出（不裁剪内容） */
 .cmap-row2 { flex-wrap: wrap; }
 .cmap-row2 .cmap-preview { min-width: 60px; }
+
+/* QGIS 配色过滤行 */
+.qgis-filter-row input { width: 100% !important; }

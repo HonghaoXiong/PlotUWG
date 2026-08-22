@@ -20,7 +20,7 @@ from core import h5inspector
 
 # 注意：plotters/probe 涉及 matplotlib，延迟到路由内 import（启动提速，不阻塞窗口）
 
-app = FastAPI(title="PlotUWG", version="0.6.1")
+app = FastAPI(title="PlotUWG", version="0.6.2")
 
 # PyInstaller 打包后 web/ 位于 _MEIPASS；源码运行时位于本文件旁
 if getattr(sys, "frozen", False):
@@ -109,7 +109,7 @@ def cmaps():
         from core import qgis_cmaps as _qg
         ramps = _qg.load_qgis_ramps()
         for name, hexes in ramps.items():
-            out.setdefault(name, hexes)
+            out.setdefault(name, hexes[::2])   # 8 点预览足够，控制响应体积
         return {"cmaps": out, "qgis": sorted(ramps.keys())}
     except Exception as e:  # noqa: BLE001
         return {"cmaps": {}, "error": str(e)}

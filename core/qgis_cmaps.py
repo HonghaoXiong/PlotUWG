@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+import json
 import re
 import sqlite3
 from pathlib import Path
@@ -122,10 +123,11 @@ def _load_xml_file(path: Path, out: dict, add=None) -> int:
 
 
 def load_qgis_ramps(force: bool = False) -> dict[str, list[str]]:
-    """加载顺序：用户 profile DB（QGIS4→QGIS3）→ App 自带默认 XML。
+    """QGIS 配色库：内置打包数据优先（任何机器都有），再叠加本机 QGIS 用户自定义。
 
-    与 matplotlib 内置同名（忽略大小写，如 Blues/Viridis/Spectral）的配色剔除，
-    避免下拉里出现重复项；QGIS 内部重名也忽略大小写去重。"""
+    内置 core/data/qgis_colormaps.json 由 tools/build_qgis_colormaps.py 在构建期
+    从 QGIS 默认 XML + cpt-city 全量渐变 + 构建机用户收藏导出。
+    与 matplotlib 内置同名（忽略大小写）剔除；重名忽略大小写去重。"""
     global _LOADED
     if _LOADED and not force:
         return RAMPS
@@ -133,20 +135,28 @@ def load_qgis_ramps(force: bool = False) -> dict[str, list[str]]:
     import matplotlib as _mpl
     mpl_lower = {n.lower() for n in _mpl.colormaps}
     out: dict[str, list[str]] = {}
+    seen: set[str] = set()
 
     def _add(name: str, hexes: list[str]) -> None:
-        if not hexes or name.lower() in mpl_lower or name.lower() in {k.lower() for k in out}:
+        low = (name or "").lower()
+        if not hexes or not low or low in mpl_lower or low in seen:
             return
+        seen.add(low)
         out[name] = hexes
 
+    # 1) 内置打包（随软件分发）
+    data_file = Path(__file__).resolve().parent / "data" / "qgis_colormaps.json"
+    if data_file.exists():
+        try:
+            doc = json.loads(data_file.read_text("utf-8"))
+            for name, hexes in (doc.get("ramps") or {}).items():
+                _add(name, hexes)
+        except Exception:  # noqa: BLE001
+            pass
+    # 2) 叠加本机 QGIS 用户配置（构建后新增的自定义配色）
     sup = Path.home() / "Library" / "Application Support" / "QGIS"
     for db in sorted(sup.glob("*/profiles/default/symbology-style.db"), reverse=True):
         _load_db(db, out, _add)
-    if not out:
-        for app in sorted(Path("/Applications").glob("QGIS*.app"), reverse=True):
-            x = app / "Contents" / "Resources" / "qgis" / "resources" / "symbology-style.xml"
-            if x.exists():
-                _load_xml_file(x, out, _add)
     RAMPS.clear()
     RAMPS.update(out)
     CMAPS.clear()

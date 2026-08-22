@@ -17,7 +17,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 APP_NAME="PlotUWG"
-VERSION="0.6.1"
+VERSION="0.6.2"
 ARCH="$(python -c 'import platform; print(platform.machine())')"
 
 echo "==> 清理旧构建"
@@ -31,6 +31,7 @@ pyinstaller --noconfirm --clean \
   --icon "H5TOUWG.icns" \
   --add-data "web:web" \
   --add-data "rust_bin/h5render:rust_bin" \
+  --add-data "core/data:core/data" \
   --hidden-import app \
   --hidden-import uvicorn.logging \
   --hidden-import uvicorn.loops.auto \

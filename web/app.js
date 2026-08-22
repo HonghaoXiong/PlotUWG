@@ -27,6 +27,7 @@ const I18N_EN = {
   "cb fraction (宽/高占比)": "cb fraction (width/height)",
   "cb pad (与图间距)": "cb pad (gap)", "cb fraction (宽)": "cb fraction (width)",
   "cb 位置": "cb location", "反转色板": "Reversed",
+  "过滤 QGIS 配色": "Filter QGIS ramps",
   "采样上限 (空=默认20万, 越大边界越平滑)": "Max samples (empty=default; higher = smoother)",
   "排版模板（不规则版式）": "Layout template (irregular grids)",
   "行高比 (逗号, 如 3,1)": "Row heights (comma, e.g. 3,1)",
@@ -280,8 +281,8 @@ async function boot() {
   try {
     const c = await api("/api/cmaps", {}, "GET");
     state.cmapColors = c.cmaps || {}; state.qgisNames = c.qgis || [];
-    // QGIS 配色到达后重建已存在的色板下拉（保留当前选择）
-    $$("#panel-list select[data-f=cmap], #panel-list select[data-ovf=cmap]").forEach((s) => { const v = s.value; fillCmapSelect(s); if (v) s.value = v; });
+    // QGIS 配色到达后重渲染面板（色板下拉 + 过滤行出现；选择从 state 恢复）
+    if (state.panels.length) renderPanels();
   } catch (_) { state.cmapColors = {}; state.qgisNames = []; }
   renderCmapPreviews();
   const recent = await api("/api/recent", {}, "GET").catch(() => ({ paths: [] }));
@@ -965,6 +966,7 @@ function renderPanels() {
         <label>列<select data-f="column" data-i="${i}"><option value="0">0</option><option value="1">1</option><option value="2">2</option></select></label>
         <label class="cmap-row">色板 <div class="cmap-row2"><select data-f="cmap" data-i="${i}"></select><span class="cmap-preview" id="cmap-prev-p-${i}" style="background:linear-gradient(90deg,#2878B5,#D97924)"></span></div></label>
         <label class="chk"><input type="checkbox" data-f="cmap_reverse" data-i="${i}" ${p.cmap_reverse ? "checked" : ""}> 反转色板</label>
+        ${QGIS_FILTER_HTML(i)}
         <label><input type="checkbox" data-f="colorbar" data-i="${i}" checked> colorbar</label>
         <label><input type="checkbox" data-f="contour" data-i="${i}" ${p.contour ? "checked" : ""}> 等值线 contour</label>
         <label>等值线值 (固定值逗号, 或单数字=条数)
@@ -990,6 +992,7 @@ function renderPanels() {
           <input type="number" data-f="color_column" data-i="${i}" value="${p.color_column ?? 2}"></label>
         <label class="cmap-row">色板 <div class="cmap-row2"><select data-f="cmap" data-i="${i}"></select><span class="cmap-preview" id="cmap-prev-p-${i}" style="background:linear-gradient(90deg,#2878B5,#D97924)"></span></div></label>
         <label class="chk"><input type="checkbox" data-f="cmap_reverse" data-i="${i}" ${p.cmap_reverse ? "checked" : ""}> 反转色板</label>
+        ${QGIS_FILTER_HTML(i)}
         <label><input type="checkbox" data-f="legend" data-i="${i}" ${p.legend === false ? "" : "checked"}> 图例</label>
         <label>图例位置<select data-f="legend_loc" data-i="${i}">
           ${["best","upper left","upper right","lower left","lower right","outside right","outside bottom"].map(l => `<option value="${l}" ${(p.legend_loc || "best") === l ? "selected" : ""}>${l}</option>`).join("")}
@@ -1104,6 +1107,13 @@ function renderPanels() {
       p[f] = v;
       savePanels();
       scheduleAutoRender();
+    });
+  });
+  // QGIS 配色过滤输入：实时重建同卡片内色板下拉的 QGIS 组
+  $$("#panel-list input.qgis-filter").forEach((inp) => {
+    inp.addEventListener("input", () => {
+      state.qgisFilter = inp.value.trim();
+      refreshQgisGroups(inp.closest(".panel-card") || document, state.qgisFilter);
     });
   });
   // aspect 自定义输入行显示恢复
@@ -1326,6 +1336,7 @@ function stressCardHTML(p, i) {
     ${["RdBu_r", "seismic", "coolwarm", "turbo", "viridis"].map(c => `<option value="${c}" ${(p.cmap || "RdBu_r") === c ? "selected" : ""}>${c}</option>`).join("")}
   </select><span class="cmap-preview" id="cmap-prev-p-${i}"></span></div></label>`;
   html += `<label class="chk"><input type="checkbox" data-f="cmap_reverse" data-i="${i}" ${p.cmap_reverse ? "checked" : ""}> 反转色板</label>`;
+  html += QGIS_FILTER_HTML(i);
   html += `<label>vmin <input type="number" step="any" data-f="vmin" data-i="${i}" value="${p.vmin ?? -8}"></label>`;
   html += `<label>vmax <input type="number" step="any" data-f="vmax" data-i="${i}" value="${p.vmax ?? 8}"></label>`;
   html += `<label>显示范围 (a,b, 只画区间内) <input data-f="mask_range" data-i="${i}" value="${(p.mask_range || []).join(",")}" placeholder="留空=全部"></label>`;
@@ -1407,6 +1418,7 @@ function materialCardHTML(p, i) {
     } else if (ov.type === "scatter") {
       html += `<label>colormap ${cmapSelectHTML(i, oi, ov.cmap, "hot_r")}</label>`;
       html += `<label class="chk"><input type="checkbox" data-act="ov-field" data-ovf="cmap_reverse" data-i="${i}" data-oi="${oi}" ${ov.cmap_reverse ? "checked" : ""}> 反转色板</label>`;
+      html += QGIS_FILTER_HTML(i);
       html += `<label>vmin <input type="number" data-act="ov-field" data-ovf="vmin" data-i="${i}" data-oi="${oi}" value="${ov.vmin ?? ""}"></label>`;
       html += `<label>vmax <input type="number" data-act="ov-field" data-ovf="vmax" data-i="${i}" data-oi="${oi}" value="${ov.vmax ?? ""}"></label>`;
       html += `<label>值下限 (≥) <input data-act="ov-field" data-ovf="mask_v" data-maskop="ge" data-i="${i}" data-oi="${oi}" value="${(ov.mask_value && ov.mask_value.ge) ?? ""}"></label>`;
@@ -1425,6 +1437,7 @@ function materialCardHTML(p, i) {
     } else if (ov.type === "field") {
       html += `<label>colormap ${cmapSelectHTML(i, oi, ov.cmap, "viridis")}</label>`;
       html += `<label class="chk"><input type="checkbox" data-act="ov-field" data-ovf="cmap_reverse" data-i="${i}" data-oi="${oi}" ${ov.cmap_reverse ? "checked" : ""}> 反转色板</label>`;
+      html += QGIS_FILTER_HTML(i);
       html += `<label>alpha <input type="number" step="0.1" data-act="ov-field" data-ovf="alpha" data-i="${i}" data-oi="${oi}" value="${ov.alpha ?? 0.5}"></label>`;
       html += `<label><input type="checkbox" data-act="ov-field" data-ovf="log10_bool" data-i="${i}" data-oi="${oi}" ${ov.log10 ? "checked" : ""}> log10</label>`;
       html += `<label>显示范围 (a,b) <input data-act="ov-field" data-ovf="mask_range_str" data-i="${i}" data-oi="${oi}" value="${(ov.mask_range || []).join(",")}" placeholder="留空=全部"></label>`;
@@ -1500,6 +1513,36 @@ const PRESET_CMAPS = {
   "Journal": ["#2878B5", "#D97924", "#2CA02C", "#D7191C", "#444444"],
 };
 
+/* QGIS 色板 optgroup（可过滤；无过滤时只显示前 300 + 提示） */
+function qgisOptgroup(filter) {
+  const names = state.qgisNames || [];
+  if (!names.length) return "";
+  const f = (filter || "").toLowerCase();
+  const list = f ? names.filter((n) => n.toLowerCase().includes(f)) : names;
+  const cap = 300;
+  const shown = list.slice(0, cap);
+  let html = `<optgroup label="QGIS 配色">`;
+  if (!f) html += `<option value="__qgis_hint__" disabled>↓ 输入关键词过滤 ${names.length} 个 QGIS 配色</option>`;
+  html += shown.map((o) => `<option value="${o}">${o}</option>`).join("");
+  if (list.length > cap) html += `<option value="__qgis_more__" disabled>…还有 ${list.length - cap} 个，继续输入缩小</option>`;
+  return html + `</optgroup>`;
+}
+function refreshQgisGroups(scopeEl, filter) {
+  scopeEl.querySelectorAll("select[data-f=cmap], select[data-ovf=cmap]").forEach((s) => {
+    const v = s.value;
+    const old = s.querySelector('optgroup[label="QGIS 配色"]');
+    if (old) old.remove();
+    s.insertAdjacentHTML("beforeend", qgisOptgroup(filter));
+    if (v) {
+      if ([...s.options].some((o) => o.value === v)) s.value = v;
+      else if ((state.qgisNames || []).includes(v)) s.insertAdjacentHTML("beforeend", `<option value="${v}" selected>${v}</option>`);
+    }
+  });
+}
+const QGIS_FILTER_HTML = (i) => (state.qgisNames || []).length
+  ? `<label class="qgis-filter-row">过滤 QGIS 配色 <input class="qgis-filter" data-i="${i}" value="${esc(state.qgisFilter || "")}" placeholder="如 bhw、cb/Blues…"></label>`
+  : "";
+
 function fillCmapSelect(sel) {
   const presets = Object.keys(PRESET_CMAPS);
   const conts = ["turbo", "viridis", "plasma", "inferno", "magma", "cividis",
@@ -1509,9 +1552,7 @@ function fillCmapSelect(sel) {
     `<optgroup label="内置预设">` + presets.map((o) => `<option value="${o}">${o}</option>`).join("") + `</optgroup>`,
     `<optgroup label="连续色板">` + conts.map((o) => `<option value="${o}">${o}</option>`).join("") + `</optgroup>`,
   ];
-  if ((state.qgisNames || []).length) {
-    opts.push(`<optgroup label="QGIS 配色">` + state.qgisNames.map((o) => `<option value="${o}">${o}</option>`).join("") + `</optgroup>`);
-  }
+  opts.push(qgisOptgroup(state.qgisFilter));
   sel.innerHTML = opts.join("");
 }
 
@@ -1541,10 +1582,7 @@ function cmapSelectHTML(i, oi, current, fallback) {
   const val = current || fallback || "turbo";
   const opt = (v, lbl) => `<option value="${v}" ${val === v ? "selected" : ""}>${lbl || v}</option>`;
   let groups = `<optgroup label="内置预设">` + presets.map((o) => opt(o)).join("") + `</optgroup>` +
-    `<optgroup label="连续色板">` + conts.map((o) => opt(o)).join("") + `</optgroup>`;
-  if ((state.qgisNames || []).length) {
-    groups += `<optgroup label="QGIS 配色">` + state.qgisNames.map((o) => opt(o)).join("") + `</optgroup>`;
-  }
+    `<optgroup label="连续色板">` + conts.map((o) => opt(o)).join("") + `</optgroup>` + qgisOptgroup(state.qgisFilter);
   return `<div class="cmap-row2">` +
     `<select data-act="ov-field" data-ovf="cmap" data-i="${i}" data-oi="${oi}">` + groups + `</select>` +
     cmapPreviewHTML(val, `cmap-prev-${i}-${oi}`) +

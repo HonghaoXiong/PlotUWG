@@ -45,7 +45,7 @@
 - **Live layout readout**: Rows/Cols show the effective auto grid in grey; type to take over, clear to restore auto
 - **Unified aspect ratio** at canvas level (per-panel override on every panel type, incl. stress & interface lines)
 - **Outside-bottom legend** auto-placed below the xlabel/ticks zone (never occludes the x-axis); **outside-right legend** auto-avoids the colorbar (moves beside it, or falls back to bottom); **colorbar size/position** adjustable (fraction/pad/location) on field, stress and overlay colorbars
-- **Local QGIS color ramps**: your QGIS style library (profile symbology-style.db, fallback to bundled defaults) is loaded into the colormap picker as a 'QGIS' group (duplicates of matplotlib built-ins removed, case-insensitive)
+- **Bundled QGIS color library (3600+ ramps)**: default QGIS ramps + full cpt-city gradient archive + curated favorites are exported at build time into `core/data/qgis_colormaps.json` and ship with the app (every install has them); local QGIS profile customs are overlaid at runtime. 'QGIS' optgroup with keyword filter; matplotlib-duplicate names removed
 - **Reversed colormap** toggle on field/stress/swarm panels and overlays (any cmap, incl. QGIS ramps)
 - **Probe click maps to the correct panel (top-origin pixel convention); **material smoothness**: per-panel sample cap (up to all particles, ParaView-like) + anti-aliased sub-pixel markers; **stress panel** locked to the exact model domain (no autoscale side gaps)
 - **Built-in palettes** with live gradients (Qaidam / Earth Structure / Journal / 17+ sequential colormaps)
