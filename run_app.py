@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""H5TOUWG 打包入口（PyInstaller + pywebview 原生窗口）。
+"""PlotUWG 打包入口（PyInstaller + pywebview 原生窗口）。
 
 - 打开 App 直接显示原生 macOS 窗口（WKWebView 内嵌），不再调起浏览器
 - 端口自动探测：8787 被占用时自动换 8788/8789…
@@ -43,7 +43,7 @@ class _Api:
 
 HOST = "127.0.0.1"
 BASE_PORT = 8787
-LOG_DIR = Path.home() / "Library" / "Application Support" / "H5TOUWG"
+LOG_DIR = Path.home() / "Library" / "Application Support" / "PlotUWG"
 WIN_W, WIN_H = 1500, 950
 
 
@@ -100,13 +100,13 @@ if __name__ == "__main__":
 
     try:
         port = _find_free_port()
-        print(f"H5TOUWG native window -> http://{HOST}:{port}")
+        print(f"PlotUWG native window -> http://{HOST}:{port}")
         threading.Thread(target=_run_server, args=(port,), daemon=True).start()
         threading.Thread(target=_warmup, daemon=True).start()
         _wait_ready(HOST, port)
         # 原生 macOS 窗口（WKWebView），关窗即退出
         webview.create_window(
-            "H5TOUWG",
+            "PlotUWG",
             f"http://{HOST}:{port}",
             width=WIN_W,
             height=WIN_H,

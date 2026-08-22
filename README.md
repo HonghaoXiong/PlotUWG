@@ -1,6 +1,6 @@
-# H5TOUWG
+# PlotUWG
 
-**H5TOUWG** is a local desktop tool for visualizing **Underworld 2** and **Badlands** numerical simulation outputs (HDF5/H5). It browses model output directories, auto-detects time steps, and produces **publication-ready A4 figures** (PNG 300dpi + PDF + SVG) with journal-style defaults — all through a modern glassmorphism UI, no Python scripting required.
+**PlotUWG** (*Plot Underworld Geodynamics*) is a local desktop tool for visualizing **Underworld 2** and **Badlands** numerical simulation outputs (HDF5/H5). It browses model output directories, auto-detects time steps, and produces **publication-ready A4 figures** (PNG 300dpi + PDF + SVG) with journal-style defaults — all through a modern glassmorphism UI, no Python scripting required.
 
 > Designed for geomodelling researchers: load a model folder, pick a time step, click to plot, export three formats. Everything is a button — no code.
 
@@ -73,7 +73,7 @@
 ```bash
 # Build on Apple Silicon (arm64) — no Python needed on the target Mac
 conda activate geopixel && pip install pyinstaller
-bash build_macos.sh          # → dist/H5TOUWG.app + dist/H5TOUWG-<ver>-arm64.dmg
+bash build_macos.sh          # → dist/PlotUWG.app + dist/PlotUWG-<ver>-arm64.dmg
 ```
 Copy the DMG to any Apple Silicon Mac, double-click to install. No Python/dependencies required.
 
@@ -98,7 +98,7 @@ python run_app.py                     # native macOS window mode
 
 ## Requirements
 - **Build machine**: macOS (Apple Silicon), Python 3.14 (conda `geopixel`), `pip install -r requirements.txt pyinstaller pywebview`
-- **Runtime (App)**: macOS 13+ arm64; model files are read-only; user data stored at `~/Library/Application Support/H5TOUWG/`
+- **Runtime (App)**: macOS 13+ arm64; model files are read-only; user data stored at `~/Library/Application Support/PlotUWG/`
 
 ## Directory Structure
 ```

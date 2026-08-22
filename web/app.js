@@ -73,7 +73,12 @@ const I18N_EN = {
   "（无）": "(none)", "字段: ": "Fields: ",
   // 时间步条与按钮
   "🗂 模型目录 · 时间自动对齐": "Model dir · time auto-align",
-  "＋ 物质场图 (Qaidam)": "+ Material (Qaidam)", "＋ 综合物质场图 (全叠加)": "+ Full overlay",
+  "＋ 物质场图": "+ Material field", "＋ 综合物质场图 (全叠加)": "+ Full overlay",
+  "＋ 界面线 · 顶/底面": "+ Interfaces · top/bottom",
+  "预设": "Preset", "自定义 / 空": "Custom / empty",
+  "Qaidam 约定 (Topo=空气底 / Sed base / Moho=地幔顶)": "Qaidam convention (Topo=air bottom / Sed base / Moho=mantle top)",
+  "选物质 index + 顶面/底面/散点；列分辨率可调；或直接套用预设。": "Pick material index + top/bottom/scatter; column resolution adjustable; or apply a preset.",
+  "文件路径": "File path", "（未设置）": "(not set)",
   "＋ 多时间步四连图…": "+ Multi-step grid...",
   "＋ 界面线 (Topo/Moho/Sed)": "+ Interfaces (Topo/Moho/Sed)",
   "＋ 应力场 (σyy)": "+ Stress field (σyy)",
@@ -465,7 +470,7 @@ function renderStepBar(scan) {
   title.textContent = "🗂 模型目录 · 时间自动对齐";
   const btn = document.createElement("button");
   btn.className = "sb-btn";
-  btn.textContent = "＋ 物质场图 (Qaidam)";
+  btn.textContent = "＋ 物质场图";
   btn.onclick = () => generateMaterialPanel(parseInt(sel.value, 10), dir, scan);
   const btnFull = document.createElement("button");
   btnFull.className = "sb-btn sb-btn-alt";
@@ -480,8 +485,8 @@ function renderStepBar(scan) {
   const btnS = document.createElement("button");
   btnS.className = "sb-btn";
   btnS.style.background = "linear-gradient(180deg,#8ab4f8,#4285f4)";
-  btnS.textContent = "＋ 界面线 (Topo/Moho/Sed)";
-  btnS.title = "选物质场 index：顶面/底面（按列极值连线，列分辨率可调）或全范围散点";
+  btnS.textContent = "＋ 界面线 · 顶/底面";
+  btnS.title = tr("通用：选物质 index 画顶面/底面（按列极值连线）或全散点；Qaidam 预设可在卡内套用", "Generic: pick material index, draw top/bottom (per-column extremes) or scatter; Qaidam preset in-card");
   btnS.onclick = () => generateSurfacesPanel(parseInt(sel.value, 10), dir);
   const btnSt = document.createElement("button");
   btnSt.className = "sb-btn";
@@ -600,6 +605,7 @@ function generateFullMaterialPanel(step, dir, scan) {
   toast(`已添加综合物质场面板 step=${step}（${nOv} 个叠加：温度/应变/速度/追踪点）`);
 }
 
+/* 通用界面线面板：默认空线（物质 index 语义因模型而异），可在卡内套用 Qaidam 预设 */
 function generateSurfacesPanel(step, dir) {
   const d = dir.replace(/\/$/, "");
   addPanel({
@@ -608,15 +614,19 @@ function generateSurfacesPanel(step, dir) {
     material_file: `${d}/materialField-${step}.h5`,
     n_segments: 100, legend: true,
     xlabel: "x [km]", ylabel: "y [km]",
-    lines: [
-      { mat: 1, mode: "min", label: "Topography", color: "#1f77b4", lw: 1.6 },
-      { mat: 2, mode: "min", label: "Sed base", color: "#ff7f0e", lw: 1.4 },
-      { mat: 3, mode: "max", label: "Moho", color: "#d62728", lw: 1.6 },
-    ],
+    lines: [],
   });
   switchTab("plot");
-  toast(tr("已添加界面线面板（顶/底面按列极值连线，可切换散点模式、调列分辨率）", "Surfaces panel added (top/bottom per-column extremes; scatter mode & column resolution available)"));
+  toast(tr("已添加界面线面板：选物质 index + 顶/底/散点；或卡内套用 Qaidam 预设", "Interfaces panel added: pick material index + top/bottom/scatter, or apply the Qaidam preset in-card"));
 }
+
+const SRF_PRESETS = {
+  qaidam: [
+    { mat: 1, mode: "min", label: "Topography", color: "#1f77b4", lw: 1.6 },
+    { mat: 2, mode: "min", label: "Sed base", color: "#ff7f0e", lw: 1.4 },
+    { mat: 3, mode: "max", label: "Moho", color: "#d62728", lw: 1.6 },
+  ],
+};
 
 function generateStressPanel(step, dir) {
   const d = dir.replace(/\/$/, "");
@@ -932,7 +942,10 @@ function renderPanels() {
     if (p.kind === "material") {
       // 在标签栏补位置信息（materialCardHTML 内部 handle 标题，这里替换标题行）
     }
-    html += `<label class="file-v">文件<small> ${esc(p.file)}</small></label>`;
+    html += `<label class="file-v">文件<small> ${esc(p.file || "（未设置）")}</small></label>`;
+    if (!p.file) {
+      html += `<label>文件路径 <input data-f="file" data-i="${i}" value="" placeholder="…/temperature-N.h5"></label>`;
+    }
     html += `<label>dataset
       <input data-f="dataset" data-i="${i}" value="${esc(p.dataset || "")}" placeholder="data"></label>`;
     if (p.kind === "field") {
@@ -1141,6 +1154,16 @@ function renderPanels() {
       savePanels();
     };
   });
+  $$("#panel-list [data-act=srf-preset]").forEach((sel) => {
+    sel.addEventListener("change", (e) => {
+      const p = state.panels[+e.target.dataset.i];
+      if (!p) return;
+      const v = e.target.value;
+      p.lines = v === "qaidam" ? SRF_PRESETS.qaidam.map((l) => ({ ...l })) : (p.lines || []);
+      if (v === "") p.lines = [];
+      renderPanels(); savePanels(); scheduleAutoRender();
+    });
+  });
   $$("#panel-list [data-act=srf-add]").forEach((btn) => {
     btn.onclick = () => {
       const p = state.panels[+btn.dataset.i];
@@ -1227,6 +1250,13 @@ function surfacesCardHTML(p, i) {
   let html = `<h4><span class="tag">界面线</span> 面板 ${i + 1} · ${posTag}
      <button class="panel-del" data-i="${i}" title="删除">✕</button></h4>`;
   html += `<label>swarm <small>${esc((p.file || "").split("/").pop())}</small></label>`;
+  html += `<label>预设 <select data-act="srf-preset" data-i="${i}">
+    <option value="">自定义 / 空</option>
+    <option value="qaidam">Qaidam 约定 (Topo=空气底 / Sed base / Moho=地幔顶)</option>
+  </select></label>`;
+  if (!(p.lines || []).length) {
+    html += `<small class="hint">选物质 index + 顶面/底面/散点；列分辨率可调；或直接套用预设。</small>`;
+  }
   html += `<label>列数 (列分辨率) <input type="number" min="2" data-f="n_segments" data-i="${i}" value="${p.n_segments ?? 100}"></label>`;
   html += `<label>提取 x 范围 (a,b, 留空=全部) <input data-f="x_range" data-i="${i}" value="${(p.x_min != null && p.x_max != null) ? `${p.x_min},${p.x_max}` : ""}" placeholder="如 0,800"></label>`;
   html += `<small class="hint">顶 = 每列最高点连线；底 = 每列最低点连线；散点 = 该材料整个范围的粒子分布</small>`;
@@ -1627,8 +1657,13 @@ function renderTplPicker() {
       state.layoutTemplate = state.layoutTemplate === t ? "" : t;
       if (state.layoutTemplate) {
         ["#cfg-rows", "#cfg-cols"].forEach((s) => { const el = $(s); if (el) { el.value = ""; delete el.dataset.auto; } });
+        // 面板数补齐到模板容量（空 field 占位，卡内可改类型/文件）
+        const cap = (_tplSpec(state.layoutTemplate) || []).reduce((a, b) => a + b, 0);
+        while (state.panels.length < cap) {
+          state.panels.push({ kind: "field", file: "", dataset: "data", cmap: "turbo", colorbar: true });
+        }
       }
-      renderTplPicker(); syncLayoutInputs(); saveConfigSilent(); scheduleAutoRender();
+      renderTplPicker(); renderPanels(); syncLayoutInputs(); saveConfigSilent(); scheduleAutoRender();
     };
     row.appendChild(b);
   });
@@ -1741,6 +1776,9 @@ async function renderPlot() {
     $("#plot-wrap").classList.remove("hidden");
     img.onload = () => {
       status.textContent = `✓ 已渲染 ${state.plotMeta.panels.length} 个面板 · A4 ${state.plotMeta.orientation} · 点击图中任意位置读数`;
+      if (state.plotMeta.layout && state.plotMeta.layout.dropped > 0) {
+        toast(tr(`⚠️ ${state.plotMeta.layout.dropped} 个面板超出模板容量，未渲染`, `${state.plotMeta.layout.dropped} panel(s) beyond template capacity not rendered`), true);
+      }
       buildProbeMarkers();
     };
     saveConfigSilent();

@@ -16,8 +16,8 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-APP_NAME="H5TOUWG"
-VERSION="0.5.0"
+APP_NAME="PlotUWG"
+VERSION="0.6.0"
 ARCH="$(python -c 'import platform; print(platform.machine())')"
 
 echo "==> 清理旧构建"
@@ -45,7 +45,7 @@ echo "==> 产物: dist/${APP_NAME}.app"
 echo "==> 打 DMG"
 dmg_name="dist/${APP_NAME}-${VERSION}-${ARCH}.dmg"
 rm -f "${dmg_name}"
-hdiutil create -volname "H5TOUWG" -srcfolder "dist/${APP_NAME}.app" \
+hdiutil create -volname "PlotUWG" -srcfolder "dist/${APP_NAME}.app" \
   -ov -format UDZO "${dmg_name}" >/dev/null
 
 echo ""

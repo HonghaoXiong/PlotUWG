@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""H5Plot Studio 启动器：启动 FastAPI 并自动打开浏览器。
+"""PlotUWG 启动器：启动 FastAPI 并自动打开浏览器。
 
 用法:
     python server.py [--port 8787] [--no-browser]

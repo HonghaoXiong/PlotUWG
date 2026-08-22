@@ -3,20 +3,22 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>H5Plot Studio — UW/Badlands h5 检视与 A4 绘图</title>
+<title>PlotUWG — UW2/Badlands h5 检视与 A4 绘图</title>
 <link rel="stylesheet" href="/static/style.css?v=20260822c">
 </head>
 <body>
 
 <header>
-  <div class="brand"><span class="logo">H</span>H5Plot Studio</div>
-  <div class="sub">UNDERWORLD / BADLANDS · H5 INSPECT + A4 PLOT</div>
+  <div class="brand"><span class="logo">P</span>PlotUWG</div>
+  <div class="sub">PLOT UNDERWORLD GEODYNAMICS · UW2 / BADLANDS · A4 PLOT</div>
   <div class="status"><span id="srv-status">--</span></div>
   <button id="lang-toggle" class="lang-toggle" title="Language">EN</button>
   <button id="cfg-toggle" class="cfg-toggle" title="绘图配置">⚙</button>
 </header>
 
 <main>
+  <!-- 抽屉遮罩必须在 main 内：main 是 z-index:1 的叠层上下文，遮罩若在外会盖住整个抽屉 -->
+  <div id="cfg-mask"></div>
   <!-- ================= 左：文件浏览器 ================= -->
   <aside id="file-panel" style="flex:none">
     <div class="file-nav">
@@ -163,7 +165,7 @@
           <button id="export-btn" class="secondary">💾 导出 PNG+PDF+SVG</button>
         </div>
         <label id="export-dir-row" class="hidden">导出目录（留空 = 图片文件所在目录）
-          <input id="cfg-export-dir" placeholder="~/Documents/H5TOUWG_export">
+          <input id="cfg-export-dir" placeholder="~/Documents/PlotUWG_export">
         </label>
         <div id="plot-status" class="status-line"></div>
       </div>
@@ -171,8 +173,6 @@
 
   </section>
 </main>
-
-<div id="cfg-mask"></div>
 
 <div id="toast"></div>
 

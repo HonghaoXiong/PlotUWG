@@ -946,3 +946,12 @@ input[data-auto] { color: var(--muted) !important; }
     transition-duration: .01ms !important;
   }
 }
+
+/* ============================================================
+   v0.6.0 修复：菜单层级 / 窄栏色板换行
+   ============================================================ */
+/* 添加面板菜单打开时抬高所在 section（玻璃层 z-index:1 会困住菜单） */
+#plot-config .cfg-section:has(.add-menu:not(.hidden)) { z-index: 60; }
+/* 窄侧栏时 colormap 行换行而非溢出（不裁剪内容） */
+.cmap-row2 { flex-wrap: wrap; }
+.cmap-row2 .cmap-preview { min-width: 60px; }
