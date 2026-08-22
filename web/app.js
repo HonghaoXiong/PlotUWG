@@ -26,6 +26,8 @@ const I18N_EN = {
   "colorbar 大小/位置": "Colorbar size/loc",
   "cb fraction (宽/高占比)": "cb fraction (width/height)",
   "cb pad (与图间距)": "cb pad (gap)", "cb fraction (宽)": "cb fraction (width)",
+  "cb 位置": "cb location",
+  "采样上限 (空=默认20万, 越大边界越平滑)": "Max samples (empty=default; higher = smoother)",
   "显示范围 (a,b, 只画区间内)": "Value range (a,b, keep inside)",
   "值下限 (≥)": "Value ≥", "值上限 (≤)": "Value ≤",
   "y 下限 (≥)": "y ≥", "y 上限 (<)": "y <",
@@ -1311,6 +1313,7 @@ function materialCardHTML(p, i) {
   html += `<label>只画材料 id（逗号分隔，留空=全部） <input data-f="only_materials" data-i="${i}" value="${((p.only_materials || []).join(","))}" placeholder="4,7"></label>`;
   html += `<label>marker 大小 <input type="number" data-f="marker_size" data-i="${i}" value="${p.marker_size ?? 1}" step="0.5"></label>`;
   html += `<label><input type="checkbox" data-f="fast" data-i="${i}" ${p.fast ? "checked" : ""}> ⚡ 快速渲染（粒子→网格，约 10x 快，出图时建议关）</label>`;
+  html += `<label>采样上限 (空=默认20万, 越大边界越平滑) <input type="number" step="100000" min="10000" data-f="max_points" data-i="${i}" value="${p.max_points ?? ""}" placeholder="200000"></label>`;
   html += aspectHTML(i, p.aspect);
   html += `<label>图例位置
     <select data-f="legend_loc" data-i="${i}">
@@ -1351,6 +1354,12 @@ function materialCardHTML(p, i) {
       html += `<label><input type="checkbox" data-act="ov-field" data-ovf="cb_bool" data-i="${i}" data-oi="${oi}" ${ov.colorbar ? "checked" : ""}> colorbar</label>`;
       html += `<label>cb fraction (宽) <input type="number" step="0.005" data-act="ov-field" data-ovf="cb_fraction" data-i="${i}" data-oi="${oi}" value="${ov.cb_fraction ?? ""}"></label>`;
       html += `<label>cb pad <input type="number" step="0.005" data-act="ov-field" data-ovf="cb_pad" data-i="${i}" data-oi="${oi}" value="${ov.cb_pad ?? ""}"></label>`;
+      html += `<label>cb 位置 <select data-act="ov-field" data-ovf="cb_location" data-i="${i}" data-oi="${oi}">
+        <option value="" ${!ov.cb_location ? "selected" : ""}>right</option>
+        <option value="bottom" ${ov.cb_location === "bottom" ? "selected" : ""}>bottom</option>
+        <option value="top" ${ov.cb_location === "top" ? "selected" : ""}>top</option>
+        <option value="left" ${ov.cb_location === "left" ? "selected" : ""}>left</option>
+      </select></label>`;
     } else if (ov.type === "field") {
       html += `<label>colormap ${cmapSelectHTML(i, oi, ov.cmap, "viridis")}</label>`;
       html += `<label>alpha <input type="number" step="0.1" data-act="ov-field" data-ovf="alpha" data-i="${i}" data-oi="${oi}" value="${ov.alpha ?? 0.5}"></label>`;
@@ -1359,6 +1368,12 @@ function materialCardHTML(p, i) {
       html += `<label><input type="checkbox" data-act="ov-field" data-ovf="cb_bool" data-i="${i}" data-oi="${oi}" ${ov.colorbar ? "checked" : ""}> colorbar</label>`;
       html += `<label>cb fraction (宽) <input type="number" step="0.005" data-act="ov-field" data-ovf="cb_fraction" data-i="${i}" data-oi="${oi}" value="${ov.cb_fraction ?? ""}"></label>`;
       html += `<label>cb pad <input type="number" step="0.005" data-act="ov-field" data-ovf="cb_pad" data-i="${i}" data-oi="${oi}" value="${ov.cb_pad ?? ""}"></label>`;
+      html += `<label>cb 位置 <select data-act="ov-field" data-ovf="cb_location" data-i="${i}" data-oi="${oi}">
+        <option value="" ${!ov.cb_location ? "selected" : ""}>right</option>
+        <option value="bottom" ${ov.cb_location === "bottom" ? "selected" : ""}>bottom</option>
+        <option value="top" ${ov.cb_location === "top" ? "selected" : ""}>top</option>
+        <option value="left" ${ov.cb_location === "left" ? "selected" : ""}>left</option>
+      </select></label>`;
     } else if (ov.type === "vectors") {
       html += `<label>文件 <input data-act="ov-field" data-ovf="file" data-i="${i}" data-oi="${oi}" value="${esc(ov.file || "")}" placeholder="…/velocityField-N.h5"></label>`;
       html += `<label>颜色 (hex 或 speed)

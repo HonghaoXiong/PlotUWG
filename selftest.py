@@ -364,8 +364,9 @@ def t_probe_material():
     })
     p = meta["panels"][0]
     px = p["x0_px"] + p["w_px"] / 2
-    py = p["y0_px"] + p["h_px"] / 2
-    r = probe.probe(meta["plot_id"], px, py, int(8.27 * meta["dpi"]), int(11.69 * meta["dpi"]))
+    H = int(11.69 * meta["dpi"])
+    py = H - p["y0_px"] - p["h_px"] / 2   # 前端顶原点坐标
+    r = probe.probe(meta["plot_id"], px, py, int(8.27 * meta["dpi"]), H)
     assert r["hit"] and "material" in r["values"] and "mat_name" in r["values"]
 check("物质场探针（最近粒子材料 id/名称）", t_probe_material)
 
@@ -378,10 +379,11 @@ def t_probe_field():
         }],
     })
     p = meta["panels"][0]
-    # 点击面板中心
+    # 点击面板中心（顶原点，与前端一致）
     px = p["x0_px"] + p["w_px"] / 2
-    py = p["y0_px"] + p["h_px"] / 2
-    r = probe.probe(meta["plot_id"], px, py, int(8.27 * meta["dpi"]), int(11.69 * meta["dpi"]))
+    H = int(11.69 * meta["dpi"])
+    py = H - p["y0_px"] - p["h_px"] / 2
+    r = probe.probe(meta["plot_id"], px, py, int(8.27 * meta["dpi"]), H)
     assert r["hit"] and "value" in r["values"]
     assert -150 <= r["y"] <= 10 and 0 <= r["x"] <= 800
 check("场图探针（返回数据坐标+值）", t_probe_field)
@@ -397,8 +399,9 @@ def t_probe_swarm():
     })
     p = meta["panels"][0]
     px = p["x0_px"] + p["w_px"] / 2
-    py = p["y0_px"] + p["h_px"] / 2
-    r = probe.probe(meta["plot_id"], px, py, int(11.69 * meta["dpi"]), int(8.27 * meta["dpi"]))
+    H = int(8.27 * meta["dpi"])
+    py = H - p["y0_px"] - p["h_px"] / 2
+    r = probe.probe(meta["plot_id"], px, py, int(11.69 * meta["dpi"]), H)
     assert r["hit"] and "nearest_index" in r["values"]
 check("swarm 探针（最近粒子索引/数值列）", t_probe_swarm)
 

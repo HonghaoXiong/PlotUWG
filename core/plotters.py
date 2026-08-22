@@ -131,7 +131,7 @@ def _subsample_with_cache(fn: str, mat_fn: str | None = None,
     idx 供叠加层（如 plasticStrain 粒子场）按同一索引对齐取值。
     """
     import hashlib
-    key = f"{os.path.getsize(fn)}:{os.path.getmtime(fn)}"
+    key = f"m{max_pts}:{os.path.getsize(fn)}:{os.path.getmtime(fn)}"
     if mat_fn:
         key += f":{os.path.getsize(mat_fn)}:{os.path.getmtime(mat_fn)}"
     h = hashlib.sha1((fn + key).encode("utf-8")).hexdigest()[:16]
@@ -379,6 +379,39 @@ def _legend_kw(panel: dict) -> dict:
     return dict(loc=loc)
 
 
+def _cb_tight_bbox(fig, cbax):
+    """colorbar 完整占位（含刻度与标签），figure 坐标。"""
+    r = fig.canvas.renderer
+    bb = cbax.get_tightbbox(r)
+    return bb.transformed(fig.transFigure.inverted()) if bb is not None else None
+
+
+def _fix_outside_right_legend(fig, ax) -> None:
+    """外右图例：与 colorbar（含刻度/标签）重叠时移到其右侧；放不下则回退外底。"""
+    leg = ax.get_legend()
+    cbax = getattr(ax, "_h5_cb_ax", None)
+    if leg is None or cbax is None:
+        return
+    fig.canvas.draw()
+    r = fig.canvas.renderer
+    inv = fig.transFigure.inverted()
+    lb = leg.get_window_extent(r).transformed(inv)
+    cbb = _cb_tight_bbox(fig, cbax) or cbax.get_position()
+    overlap = lb.x1 > cbb.x0 and lb.x0 < cbb.x1 and lb.y1 > cbb.y0 and lb.y0 < cbb.y1
+    if not overlap:
+        return
+    pos = ax.get_position()
+    new_x0 = cbb.x1 + 0.01
+    if new_x0 + lb.width <= 0.995:
+        leg.set_bbox_to_anchor(((new_x0 - pos.x0) / max(pos.width, 1e-6), 0.5))
+    else:
+        handles, labels = ax.get_legend_handles_labels()
+        leg.remove()
+        if handles:
+            ax.legend(handles, labels, **_legend_kw({"legend_loc": "outside bottom"}))
+            _fix_outside_bottom_legend(fig, ax)
+
+
 def _fix_outside_bottom_legend(fig, ax) -> None:
     """外底图例排版：整体放到 xlabel+ticks 占位区之下，不遮挡 x 轴；
     若超出页面底边则把 axes 上移腾出空间（probe 元信息在修正后记录）。"""
@@ -392,6 +425,12 @@ def _fix_outside_bottom_legend(fig, ax) -> None:
     xb = ax.xaxis.get_tightbbox(r)
     # 图例顶边需低于 xlabel 底边（xb.y0 = 整个 x 轴占位区的下缘）
     xzone_bottom = inv.transform((0, xb.y0))[1] if xb is not None else pos.y0 - 0.05
+    # 若底部还有 colorbar，图例也要在 colorbar 之上
+    cbax = getattr(ax, "_h5_cb_ax", None)
+    if cbax is not None:
+        cbb = _cb_tight_bbox(fig, cbax) or cbax.get_position()
+        if cbb.y1 <= pos.y0 + 0.02:
+            xzone_bottom = min(xzone_bottom, cbb.y1)
     lb = leg.get_window_extent(r).transformed(inv)
     gap = 0.010
     desired_top = xzone_bottom - gap
@@ -825,7 +864,9 @@ def draw_material(ax, panel: dict, style: dict) -> dict:
     if panel.get("fast"):
         return _draw_material_fast(ax, panel, style)
     mfile = panel.get("material_file") or fn
-    xy, mat, idx = _subsample_with_cache(fn, mfile if mfile and Path(mfile).exists() else None)
+    max_pts = int(panel.get("max_points") or MAX_SWARM_POINTS)
+    xy, mat, idx = _subsample_with_cache(fn, mfile if mfile and Path(mfile).exists() else None,
+                                         max_pts=max_pts)
     x, y = xy[:, int(panel.get("x_col", 0))], xy[:, int(panel.get("y_col", 1))]
     n = len(x)
     if n == 0:
@@ -851,12 +892,13 @@ def draw_material(ax, panel: dict, style: dict) -> dict:
     lookup = _material_lookup(cmap_values)
     raster = bool(panel.get("rasterized", True))
     colors = np.array([lookup(m) for m in mat])
-    scatter = ax.scatter(x, y, s=float(panel.get("marker_size", 1)),
+    _ms = float(panel.get("marker_size", 1))
+    scatter = ax.scatter(x, y, s=_ms,
                          c=colors, rasterized=raster, marker=panel.get("marker", "o"),
                          alpha=float(panel.get("alpha", 1.0)),
                          edgecolors=panel.get("edgecolors", "none"),
                          linewidths=float(panel.get("edge_width", 0.4)),
-                         antialiased=False)
+                         antialiased=_ms < 1)  # 亚像素 marker 开抗锯齿，避免黑噪点
     if panel.get("legend", True):
         uniq = np.unique(mat)
         labels = {u: C.MATERIAL_NAMES.get(int(u), f"mat {u}") for u in uniq}
@@ -1104,6 +1146,11 @@ def draw_stress(ax, panel: dict, style: dict) -> dict:
                     cmap=_resolve_cmap(panel, default="RdBu_r"),
                     vmin=vmin, vmax=vmax, s=float(panel.get("marker_size", 1.5)),
                     rasterized=True, antialiased=False)
+    # 默认锁定模型全域范围（不留 autoscale 边距，左右不空）
+    if not panel.get("xlim") and len(vals):
+        ax.set_xlim(float(centers[:, 0].min()), float(centers[:, 0].max()))
+    if not panel.get("ylim") and len(vals):
+        ax.set_ylim(float(centers[:, 1].min()), float(centers[:, 1].max()))
     if panel.get("colorbar", True):
         cb = ax.figure.colorbar(sc, ax=ax, **(_colorbar_kw(panel) or dict(fraction=0.046, pad=0.04)))
         cb.ax.tick_params(labelsize=style.get("tick_size", 7))
@@ -1263,9 +1310,16 @@ def render_plot(req: dict) -> dict:
                     ha="center")
             viewer = {"kind": kind}
         else:
+            n_axes_before = len(fig.axes)
             try:
                 viewer = DRAWS[kind](ax, panel, style)
-                if panel.get("legend_loc") == "outside bottom":
+                # 记录本面板新增的 colorbar axes（供图例避让使用）
+                for _cbax in fig.axes[n_axes_before:]:
+                    if _cbax is not ax:
+                        ax._h5_cb_ax = _cbax
+                if panel.get("legend_loc") == "outside right":
+                    _fix_outside_right_legend(fig, ax)
+                elif panel.get("legend_loc") == "outside bottom":
                     _fix_outside_bottom_legend(fig, ax)
                 if panel.get("title"):
                     ax.set_title(panel["title"], fontsize=style.get("title_size", 8))

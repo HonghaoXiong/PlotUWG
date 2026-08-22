@@ -39,7 +39,8 @@
 - **Resizable side bars** (ParaView/Inkscape-style drag splitters, double-click to reset, persisted)
 - **Live layout readout**: Rows/Cols show the effective auto grid in grey; type to take over, clear to restore auto
 - **Unified aspect ratio** at canvas level (per-panel override on every panel type, incl. stress & interface lines)
-- **Outside-bottom legend** auto-placed below the xlabel/ticks zone (never occludes the x-axis); **colorbar size/position** adjustable (fraction/pad/location) on field, stress and overlay colorbars
+- **Outside-bottom legend** auto-placed below the xlabel/ticks zone (never occludes the x-axis); **outside-right legend** auto-avoids the colorbar (moves beside it, or falls back to bottom); **colorbar size/position** adjustable (fraction/pad/location) on field, stress and overlay colorbars
+- **Probe click** maps to the correct panel (top-origin pixel convention); **material smoothness**: per-panel sample cap (up to all particles, ParaView-like) + anti-aliased sub-pixel markers; **stress panel** locked to the exact model domain (no autoscale side gaps)
 - **Built-in palettes** with live gradients (Qaidam / Earth Structure / Journal / 17+ sequential colormaps)
 - **Dial-a-color** native color pickers for single colors (background, contour, grid, vectors)
 - **Aspect ratio**: auto / data-equal (e.g. 800km:160km → 5:1 band) / custom numeric

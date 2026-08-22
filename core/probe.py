@@ -186,13 +186,16 @@ def probe(plot_id: str, px_x: float, px_y: float,
     best = None
     for panel in meta.get("panels", []):
         i = panel["i"]
-        x0, y0 = panel["x0_px"], panel["y0_px"]
-        if px_x < x0 or px_x > x0 + panel["w_px"]:
+        # meta bbox 为 matplotlib 底原点坐标；前端点击为顶原点 → 统一翻转为顶原点
+        pp = dict(panel)
+        pp["y0_px"] = fig_h_px - panel["y0_px"] - panel["h_px"]
+        x0, y0 = pp["x0_px"], pp["y0_px"]
+        if px_x < x0 or px_x > x0 + pp["w_px"]:
             continue
-        if px_y < y0 or px_y > y0 + panel["h_px"]:
+        if px_y < y0 or px_y > y0 + pp["h_px"]:
             continue
         try:
-            dx, dy = _data_from_px(panel, px_x, px_y, fig_w_px, fig_h_px)
+            dx, dy = _data_from_px(pp, px_x, px_y, fig_w_px, fig_h_px)
         except Exception:  # noqa: BLE001
             continue
         ptype = str(data[f"p{i}_type"]) if f"p{i}_type" in data else ""
