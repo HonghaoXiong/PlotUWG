@@ -26,7 +26,7 @@ const I18N_EN = {
   "colorbar 大小/位置": "Colorbar size/loc",
   "cb fraction (宽/高占比)": "cb fraction (width/height)",
   "cb pad (与图间距)": "cb pad (gap)", "cb fraction (宽)": "cb fraction (width)",
-  "cb 位置": "cb location",
+  "cb 位置": "cb location", "反转色板": "Reversed",
   "采样上限 (空=默认20万, 越大边界越平滑)": "Max samples (empty=default; higher = smoother)",
   "排版模板（不规则版式）": "Layout template (irregular grids)",
   "行高比 (逗号, 如 3,1)": "Row heights (comma, e.g. 3,1)",
@@ -922,8 +922,15 @@ function renderCmapPreviews() {
     if (!sel) return;
     const prev = row.querySelector(".cmap-preview");
     if (!prev) return;
-    const cs = state.cmapColors[sel.value] || PRESET_CMAPS[sel.value];
-    if (cs && cs.length) prev.style.background = "linear-gradient(90deg," + cs.join(",") + ")";
+    let cs = state.cmapColors[sel.value] || PRESET_CMAPS[sel.value];
+    if (cs && cs.length) {
+      const i = +sel.dataset.i;
+      const rev = sel.dataset.ovf !== undefined
+        ? (state.panels[i] && (state.panels[i].overlays || [])[+sel.dataset.oi] || {}).cmap_reverse
+        : state.panels[i] && state.panels[i].cmap_reverse;
+      if (rev) cs = [...cs].reverse();
+      prev.style.background = "linear-gradient(90deg," + cs.join(",") + ")";
+    }
   });
 }
 
@@ -957,6 +964,7 @@ function renderPanels() {
       html += `
         <label>列<select data-f="column" data-i="${i}"><option value="0">0</option><option value="1">1</option><option value="2">2</option></select></label>
         <label class="cmap-row">色板 <div class="cmap-row2"><select data-f="cmap" data-i="${i}"></select><span class="cmap-preview" id="cmap-prev-p-${i}" style="background:linear-gradient(90deg,#2878B5,#D97924)"></span></div></label>
+        <label class="chk"><input type="checkbox" data-f="cmap_reverse" data-i="${i}" ${p.cmap_reverse ? "checked" : ""}> 反转色板</label>
         <label><input type="checkbox" data-f="colorbar" data-i="${i}" checked> colorbar</label>
         <label><input type="checkbox" data-f="contour" data-i="${i}" ${p.contour ? "checked" : ""}> 等值线 contour</label>
         <label>等值线值 (固定值逗号, 或单数字=条数)
@@ -981,6 +989,7 @@ function renderPanels() {
         <label id="swarm-col-row-${i}" ${p.color_by !== "column" ? 'class="hidden"' : ""}>数值列号
           <input type="number" data-f="color_column" data-i="${i}" value="${p.color_column ?? 2}"></label>
         <label class="cmap-row">色板 <div class="cmap-row2"><select data-f="cmap" data-i="${i}"></select><span class="cmap-preview" id="cmap-prev-p-${i}" style="background:linear-gradient(90deg,#2878B5,#D97924)"></span></div></label>
+        <label class="chk"><input type="checkbox" data-f="cmap_reverse" data-i="${i}" ${p.cmap_reverse ? "checked" : ""}> 反转色板</label>
         <label><input type="checkbox" data-f="legend" data-i="${i}" ${p.legend === false ? "" : "checked"}> 图例</label>
         <label>图例位置<select data-f="legend_loc" data-i="${i}">
           ${["best","upper left","upper right","lower left","lower right","outside right","outside bottom"].map(l => `<option value="${l}" ${(p.legend_loc || "best") === l ? "selected" : ""}>${l}</option>`).join("")}
@@ -1077,9 +1086,10 @@ function renderPanels() {
         if (PRESET_CMAPS[v]) { p.cmap_values = PRESET_CMAPS[v]; p.cmap = v; }
         else { p.cmap = v; delete p.cmap_values; }
         const prev = document.getElementById(`cmap-prev-p-${i}`);
-        if (prev) { const cs = state.cmapColors[v] || PRESET_CMAPS[v]; if (cs && cs.length) prev.style.background = "linear-gradient(90deg," + cs.join(",") + ")"; }
+        if (prev) { let cs = state.cmapColors[v] || PRESET_CMAPS[v]; if (cs && cs.length) { if (p.cmap_reverse) cs = [...cs].reverse(); prev.style.background = "linear-gradient(90deg," + cs.join(",") + ")"; } }
         return;
       }
+      if (f === "cmap_reverse") { p[f] = v; renderCmapPreviews(); savePanels(); scheduleAutoRender(); return; }
       if (f === "fast") { p.fast = e.target.checked; savePanels(); return; }
       if (f === "aspect") {
         const row = document.getElementById(`aspect-num-row-${i}`);
@@ -1232,9 +1242,10 @@ function renderPanels() {
         if (PRESET_CMAPS[v]) { ov.cmap_values = PRESET_CMAPS[v]; ov.cmap = v; }
         else { ov.cmap = v; delete ov.cmap_values; }
         const prev = document.getElementById(`cmap-prev-${e.target.dataset.i}-${e.target.dataset.oi}`);
-        if (prev) { const cs = state.cmapColors[v] || PRESET_CMAPS[v]; if (cs && cs.length) prev.style.background = "linear-gradient(90deg," + cs.join(",") + ")"; }
+        if (prev) { let cs = state.cmapColors[v] || PRESET_CMAPS[v]; if (cs && cs.length) { if (ov.cmap_reverse) cs = [...cs].reverse(); prev.style.background = "linear-gradient(90deg," + cs.join(",") + ")"; } }
         return;
       }
+      if (key === "cmap_reverse") { ov[key] = v; renderCmapPreviews(); scheduleAutoRender(); return; }
       if (key === "clabel_bool") { ov.clabel = v; return; }
       if (key === "cb_bool") { ov.colorbar = v; return; }
       if (key === "log10_bool") { ov.log10 = v; return; }
@@ -1314,6 +1325,7 @@ function stressCardHTML(p, i) {
   html += `<label>colormap <div class="cmap-row2"><select data-f="cmap" data-i="${i}">
     ${["RdBu_r", "seismic", "coolwarm", "turbo", "viridis"].map(c => `<option value="${c}" ${(p.cmap || "RdBu_r") === c ? "selected" : ""}>${c}</option>`).join("")}
   </select><span class="cmap-preview" id="cmap-prev-p-${i}"></span></div></label>`;
+  html += `<label class="chk"><input type="checkbox" data-f="cmap_reverse" data-i="${i}" ${p.cmap_reverse ? "checked" : ""}> 反转色板</label>`;
   html += `<label>vmin <input type="number" step="any" data-f="vmin" data-i="${i}" value="${p.vmin ?? -8}"></label>`;
   html += `<label>vmax <input type="number" step="any" data-f="vmax" data-i="${i}" value="${p.vmax ?? 8}"></label>`;
   html += `<label>显示范围 (a,b, 只画区间内) <input data-f="mask_range" data-i="${i}" value="${(p.mask_range || []).join(",")}" placeholder="留空=全部"></label>`;
@@ -1394,6 +1406,7 @@ function materialCardHTML(p, i) {
       html += `<label><input type="checkbox" data-act="ov-field" data-ovf="clabel_bool" data-i="${i}" data-oi="${oi}" ${ov.clabel === false ? "" : "checked"}> 标注等值线数值</label>`;
     } else if (ov.type === "scatter") {
       html += `<label>colormap ${cmapSelectHTML(i, oi, ov.cmap, "hot_r")}</label>`;
+      html += `<label class="chk"><input type="checkbox" data-act="ov-field" data-ovf="cmap_reverse" data-i="${i}" data-oi="${oi}" ${ov.cmap_reverse ? "checked" : ""}> 反转色板</label>`;
       html += `<label>vmin <input type="number" data-act="ov-field" data-ovf="vmin" data-i="${i}" data-oi="${oi}" value="${ov.vmin ?? ""}"></label>`;
       html += `<label>vmax <input type="number" data-act="ov-field" data-ovf="vmax" data-i="${i}" data-oi="${oi}" value="${ov.vmax ?? ""}"></label>`;
       html += `<label>值下限 (≥) <input data-act="ov-field" data-ovf="mask_v" data-maskop="ge" data-i="${i}" data-oi="${oi}" value="${(ov.mask_value && ov.mask_value.ge) ?? ""}"></label>`;
@@ -1411,6 +1424,7 @@ function materialCardHTML(p, i) {
       </select></label>`;
     } else if (ov.type === "field") {
       html += `<label>colormap ${cmapSelectHTML(i, oi, ov.cmap, "viridis")}</label>`;
+      html += `<label class="chk"><input type="checkbox" data-act="ov-field" data-ovf="cmap_reverse" data-i="${i}" data-oi="${oi}" ${ov.cmap_reverse ? "checked" : ""}> 反转色板</label>`;
       html += `<label>alpha <input type="number" step="0.1" data-act="ov-field" data-ovf="alpha" data-i="${i}" data-oi="${oi}" value="${ov.alpha ?? 0.5}"></label>`;
       html += `<label><input type="checkbox" data-act="ov-field" data-ovf="log10_bool" data-i="${i}" data-oi="${oi}" ${ov.log10 ? "checked" : ""}> log10</label>`;
       html += `<label>显示范围 (a,b) <input data-act="ov-field" data-ovf="mask_range_str" data-i="${i}" data-oi="${oi}" value="${(ov.mask_range || []).join(",")}" placeholder="留空=全部"></label>`;

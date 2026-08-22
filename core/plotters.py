@@ -328,14 +328,19 @@ def _resolve_cmap(panel: dict, discrete: bool = False, default: str = "turbo"):
     """
     vals = panel.get("cmap_values")
     if vals:
-        if discrete:
-            return matplotlib.colors.ListedColormap(vals)
-        return matplotlib.colors.LinearSegmentedColormap.from_list("preset", vals, 256)
+        cm = (matplotlib.colors.ListedColormap(vals) if discrete
+              else matplotlib.colors.LinearSegmentedColormap.from_list("preset", vals, 256))
+        return cm.reversed() if panel.get("cmap_reverse") else cm
     from .qgis_cmaps import get_cmap as _qgis_cmap
     q = _qgis_cmap(panel.get("cmap", ""))
-    if q is not None:
-        return q
-    return plt.get_cmap(panel.get("cmap", default))
+    cm = q if q is not None else plt.get_cmap(panel.get("cmap", default))
+    # 反转色板（matplotlib *_r 同效）
+    if panel.get("cmap_reverse"):
+        try:
+            cm = cm.reversed()
+        except Exception:  # noqa: BLE001
+            pass
+    return cm
 
 
 def _apply_axes_common(ax, panel: dict) -> None:

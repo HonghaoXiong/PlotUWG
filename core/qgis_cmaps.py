@@ -80,15 +80,17 @@ def parse_ramp_xml(xml: str) -> list[str] | None:
     return _sample(stops)
 
 
-def _load_db(db: Path, out: dict) -> int:
+def _load_db(db: Path, out: dict, add=None) -> int:
     n = 0
     try:
         con = sqlite3.connect(str(db))
         for _name, xml in con.execute("select name, xml from colorramp"):
-            if _name in out:
-                continue
             hexes = parse_ramp_xml(xml or "")
-            if hexes:
+            if add is not None:
+                before = len(out)
+                add(_name, hexes or [])
+                n += len(out) - before
+            elif _name not in out and hexes:
                 out[_name] = hexes
                 n += 1
         con.close()
@@ -97,17 +99,21 @@ def _load_db(db: Path, out: dict) -> int:
     return n
 
 
-def _load_xml_file(path: Path, out: dict) -> int:
+def _load_xml_file(path: Path, out: dict, add=None) -> int:
     n = 0
     try:
         text = path.read_text("utf-8", errors="ignore")
         for m in re.finditer(r"<colorramp\b.*?</colorramp>", text, re.S):
             block = m.group(0)
             nm = re.search(r'name="([^"]+)"', block)
-            if not nm or nm.group(1) in out:
+            if not nm:
                 continue
             hexes = parse_ramp_xml(block)
-            if hexes:
+            if add is not None:
+                before = len(out)
+                add(nm.group(1), hexes or [])
+                n += len(out) - before
+            elif nm.group(1) not in out and hexes:
                 out[nm.group(1)] = hexes
                 n += 1
     except Exception:  # noqa: BLE001
@@ -116,20 +122,31 @@ def _load_xml_file(path: Path, out: dict) -> int:
 
 
 def load_qgis_ramps(force: bool = False) -> dict[str, list[str]]:
-    """加载顺序：用户 profile DB（QGIS4→QGIS3）→ App 自带默认 XML。"""
+    """加载顺序：用户 profile DB（QGIS4→QGIS3）→ App 自带默认 XML。
+
+    与 matplotlib 内置同名（忽略大小写，如 Blues/Viridis/Spectral）的配色剔除，
+    避免下拉里出现重复项；QGIS 内部重名也忽略大小写去重。"""
     global _LOADED
     if _LOADED and not force:
         return RAMPS
     _LOADED = True
+    import matplotlib as _mpl
+    mpl_lower = {n.lower() for n in _mpl.colormaps}
     out: dict[str, list[str]] = {}
+
+    def _add(name: str, hexes: list[str]) -> None:
+        if not hexes or name.lower() in mpl_lower or name.lower() in {k.lower() for k in out}:
+            return
+        out[name] = hexes
+
     sup = Path.home() / "Library" / "Application Support" / "QGIS"
     for db in sorted(sup.glob("*/profiles/default/symbology-style.db"), reverse=True):
-        _load_db(db, out)
+        _load_db(db, out, _add)
     if not out:
         for app in sorted(Path("/Applications").glob("QGIS*.app"), reverse=True):
             x = app / "Contents" / "Resources" / "qgis" / "resources" / "symbology-style.xml"
             if x.exists():
-                _load_xml_file(x, out)
+                _load_xml_file(x, out, _add)
     RAMPS.clear()
     RAMPS.update(out)
     CMAPS.clear()
