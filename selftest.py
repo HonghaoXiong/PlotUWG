@@ -1,19 +1,29 @@
 #!/usr/bin/env python3
-"""H5Plot Studio 端到端自检：真实 uw217 / Badlands h5 数据。
+"""PlotUWG 端到端自检：真实 uw217 / Badlands h5 数据。
 
 用法（geopixel 环境）:
-    cd h5plot_studio && python selftest.py
+    PLOTUWG_UW_DIR=/path/to/uw217_model_dir \\
+    PLOTUWG_BD_DIR=/path/to/badlands/tin.time50.hdf5 \\
+    python selftest.py
+未设置环境变量时自动跳过全部用例。
 """
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
-UW = "/Users/haibinyang/Xiong_test/workspace/2e-5_Weak_8Vel/uw217_2e-5_WeakLM_8Vel"
-BD = "/Users/haibinyang/Xiong_test/workspace/2e-5_Weak_8Vel/outbdls/reh5/tin.time50.hdf5"
+# 模型测试数据路径：用环境变量注入（仓库公开，不写死本机路径）
+#   PLOTUWG_UW_DIR  = 一个 uw217 模型输出目录（含 swarm-0.h5、materialField-0.h5、mesh.h5 等）
+#   PLOTUWG_BD_DIR  = 一个 Badlands 输出文件（如 tin.time50.hdf5）
+UW = os.environ.get("PLOTUWG_UW_DIR", "")
+BD = os.environ.get("PLOTUWG_BD_DIR", "")
+if not UW or not BD:
+    print("跳过：设置 PLOTUWG_UW_DIR 与 PLOTUWG_BD_DIR 后运行（见 README「Self-Test」）")
+    sys.exit(0)
 
 ok = 0; fail = 0
 

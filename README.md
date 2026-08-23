@@ -128,7 +128,10 @@ h5plot_studio/
 
 ## Self-Test
 ```bash
-conda activate geopixel && python selftest.py   # 20 checks: inspect/render/probe/export
+# Model test data paths are injected via environment variables (no hardcoded local paths)
+PLOTUWG_UW_DIR=/path/to/uw217_model_dir \
+PLOTUWG_BD_DIR=/path/to/badlands/tin.time50.hdf5 \
+python selftest.py   # inspect / render / layout templates / probe / export
 ```
 
 ## License
