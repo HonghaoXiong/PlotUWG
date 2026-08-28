@@ -1059,7 +1059,7 @@ function renderPanels() {
       let v = e.target.type === "checkbox" ? e.target.checked : e.target.value;
       if (f === "xlim") v = v.split(",").map(Number);
       if (f === "ylim") v = v.split(",").map(Number);
-      if (["vmin", "vmax", "cb_fraction", "cb_pad"].includes(f)) v = v === "" ? null : parseFloat(v);
+      if (["vmin", "vmax", "cb_fraction", "cb_pad", "subset_frac", "max_points"].includes(f)) v = v === "" ? null : parseFloat(v);
       if (f === "columns_str") p.columns = v.split(",").map(Number);
       if (f === "only_materials") v = v.trim() ? v.split(",").map((s) => parseInt(s.trim(), 10)) : [];
       if (f === "contour_levels") {
@@ -1386,6 +1386,7 @@ function materialCardHTML(p, i) {
   html += `<label>marker 大小 <input type="number" data-f="marker_size" data-i="${i}" value="${p.marker_size ?? 1}" step="0.5"></label>`;
   html += `<label><input type="checkbox" data-f="fast" data-i="${i}" ${p.fast ? "checked" : ""}> ⚡ 快速渲染（粒子→网格，约 10x 快，出图时建议关）</label>`;
   html += `<label>采样上限 (空=默认20万, 越大边界越平滑) <input type="number" step="100000" min="10000" data-f="max_points" data-i="${i}" value="${p.max_points ?? ""}" placeholder="200000"></label>`;
+  html += `<label>抽稀比例 subset_frac (0-1, 留空=按采样上限; 设定后优先于采样上限) <input type="number" step="0.05" min="0.01" max="1" data-f="subset_frac" data-i="${i}" value="${p.subset_frac ?? ""}" placeholder="如 0.2"></label>`;
   html += aspectHTML(i, p.aspect);
   html += `<label>图例位置
     <select data-f="legend_loc" data-i="${i}">

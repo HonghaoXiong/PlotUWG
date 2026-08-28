@@ -16,6 +16,7 @@ from pathlib import Path
 
 import h5py
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -525,9 +526,6 @@ def _draw_material_fast(ax, panel: dict, style: dict) -> dict:
     for i, m in enumerate(uniq):
         cnts[:, i] = np.bincount(bin_id[mat == m], minlength=ny * nx)
     # 密度合成：每 bin 各材料计数 → 材料色×密度 alpha 逐层叠加（保留散点密度质感）
-    winner = np.argmax(cnts, axis=1)
-    has = cnts.max(axis=1) > 0
-    mid = np.where(has, uniq[winner], -1)
     lookup = _material_lookup(panel.get("cmap_values"))
     import matplotlib.colors as mcolors
     bg_rgb = mcolors.to_rgb(bg or "#FFFFFF")
@@ -667,11 +665,16 @@ def draw_swarm(ax, panel: dict, style: dict) -> dict:
         mat = None
         cvals = xy[:, ccol]
 
-    sub = max(0, int(panel.get("subset_frac", 1.0) * n) if panel.get("subset_frac") else MAX_SWARM_POINTS)
-    frac = min(1.0, MAX_SWARM_POINTS / max(n, 1))
+    # 抽稀：subset_frac 显式指定保留比例（0,1]，优先于采样上限；未指定时按上限自动抽稀
+    sf = panel.get("subset_frac")
+    if sf:
+        frac = min(1.0, max(float(sf), 1.0 / max(n, 1)))
+    else:
+        cap = int(panel.get("max_points") or MAX_SWARM_POINTS)
+        frac = min(1.0, cap / max(n, 1))
     if frac < 1.0:
         rng = np.random.default_rng(7)
-        idx = rng.choice(n, int(n * frac), replace=False)
+        idx = rng.choice(n, int(round(n * frac)), replace=False)
         x, y = x[idx], y[idx]
         if mat is not None:
             mat = mat[idx]
@@ -696,7 +699,6 @@ def draw_swarm(ax, panel: dict, style: dict) -> dict:
             ax.legend(handles=handles, fontsize=style.get("legend_size", 6.5),
                       frameon=False, markerscale=4, **_legend_kw(panel))
     else:
-        import matplotlib.cm as cm
         norm = None
         if panel.get("vmin") is not None or panel.get("vmax") is not None:
             vmin = float(panel.get("vmin", cvals.min()))
@@ -892,6 +894,12 @@ def draw_material(ax, panel: dict, style: dict) -> dict:
         return _draw_material_fast(ax, panel, style)
     mfile = panel.get("material_file") or fn
     max_pts = int(panel.get("max_points") or MAX_SWARM_POINTS)
+    sf = panel.get("subset_frac")
+    if sf:
+        # subset_frac 显式指定保留比例，与采样上限取较小者
+        with h5py.File(fn, "r") as f:
+            n_total = f["data"].shape[0]
+        max_pts = min(max_pts, max(1, round(n_total * min(1.0, float(sf)))))
     xy, mat, idx = _subsample_with_cache(fn, mfile if mfile and Path(mfile).exists() else None,
                                          max_pts=max_pts)
     x, y = xy[:, int(panel.get("x_col", 0))], xy[:, int(panel.get("y_col", 1))]
@@ -920,12 +928,12 @@ def draw_material(ax, panel: dict, style: dict) -> dict:
     raster = bool(panel.get("rasterized", True))
     colors = np.array([lookup(m) for m in mat])
     _ms = float(panel.get("marker_size", 1))
-    scatter = ax.scatter(x, y, s=_ms,
-                         c=colors, rasterized=raster, marker=panel.get("marker", "o"),
-                         alpha=float(panel.get("alpha", 1.0)),
-                         edgecolors=panel.get("edgecolors", "none"),
-                         linewidths=float(panel.get("edge_width", 0.4)),
-                         antialiased=_ms < 1)  # 亚像素 marker 开抗锯齿，避免黑噪点
+    ax.scatter(x, y, s=_ms,
+               c=colors, rasterized=raster, marker=panel.get("marker", "o"),
+               alpha=float(panel.get("alpha", 1.0)),
+               edgecolors=panel.get("edgecolors", "none"),
+               linewidths=float(panel.get("edge_width", 0.4)),
+               antialiased=_ms < 1)  # 亚像素 marker 开抗锯齿，避免黑噪点
     if panel.get("legend", True):
         uniq = np.unique(mat)
         labels = {u: C.MATERIAL_NAMES.get(int(u), f"mat {u}") for u in uniq}
@@ -1012,7 +1020,7 @@ def _overlay_contour(ax, ov: dict, ofile: str, style: dict) -> None:
         mr = ov.get("label_region") or {}
         if mr:
             manual = []
-            for i, segs in enumerate(cs.allsegs):
+            for _i, segs in enumerate(cs.allsegs):
                 vis = [(float(v[0]), float(v[1])) for s in segs for v in s
                        if mr.get("x0", -1e9) <= v[0] <= mr.get("x1", 1e9)
                        and mr.get("y0", -1e9) <= v[1] <= mr.get("y1", 1e9)]
@@ -1280,7 +1288,8 @@ def _ratios(v: object, n: int) -> list:
 
 def _spec_cache_key(req: dict) -> str:
     """渲染 spec + 相关文件 mtime + 代码版本的指纹；相同请求直接复用产物（秒回）。"""
-    import hashlib, sys
+    import hashlib
+    import sys
     h = hashlib.sha1()
     # 代码版本指纹：plotters/config 源码改动后旧缓存自动失效
     for mod in ("core.plotters", "core.config"):
@@ -1352,7 +1361,6 @@ def render_plot(req: dict) -> dict:
                           wspace=0.35,
                           height_ratios=hr, width_ratios=wr)
     panel_meta = []
-    probe_payloads = {}
     dropped = max(0, len(panels) - capacity)
     for i, panel in enumerate(panels[:capacity]):
         # 模板放置：cells 由 _layout 按 '2+1' 等模板算出 (row, col_start, span)
