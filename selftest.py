@@ -40,6 +40,7 @@ def check(name, fn):
 print("== 0. 模型时间步扫描 ==")
 from core import h5inspector
 
+
 def t_stepscan():
     s = h5inspector.scan_model_dir(UW)
     assert s["is_model_dir"]
@@ -48,7 +49,6 @@ def t_stepscan():
 check("模型目录时间步扫描（时间自动对齐）", t_stepscan)
 
 print("== 1. 检视器 ==")
-from core import h5inspector
 def t_inspect_swarm():
     inf = h5inspector.inspect_h5_file(UW + "/swarm-0.h5")
     assert inf["type"] == "swarm" and inf["n_datasets"] == 1
@@ -73,6 +73,7 @@ check("目录浏览", t_listing)
 
 print("== 2. 渲染 ==")
 from core import plotters as P
+
 
 def t_material():
     # 物质场：材质 + 温度等值线叠加 + 应变散点（阈值）+ 粘度场半透明
@@ -438,6 +439,7 @@ check("盒比例 16:9/4:3 + 四行两列模板", t_box_ratio_169)
 print("== 3. probe 点击读数 ==")
 from core import probe
 
+
 def t_probe_material():
     meta = P.render_plot({
         "orientation": "portrait", "style": {},
@@ -492,8 +494,12 @@ def t_probe_swarm():
 check("swarm 探针（最近粒子索引/数值列）", t_probe_swarm)
 
 print("== 4. 导出 ==")
-import shutil, tempfile, os
+import os
+import shutil
+import tempfile
+
 from core import config as C
+
 
 def t_export():
     meta = P.render_plot({

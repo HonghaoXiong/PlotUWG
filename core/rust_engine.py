@@ -9,17 +9,14 @@
 from __future__ import annotations
 
 import json
-import os
 import struct
 import subprocess
-import sys
 from pathlib import Path
 
 import h5py
 import numpy as np
 
-from . import config as C
-from .plotters import _subsample_with_cache, _mesh_geometry, _field_grid, PLOT_DIR
+from .plotters import PLOT_DIR, _field_grid, _mesh_geometry, _subsample_with_cache
 
 RUST_BIN = Path(__file__).resolve().parents[1] / "rust_bin" / "h5render"
 

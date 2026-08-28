@@ -9,7 +9,6 @@ plot_basin_orogen_convergence_partition.py，2026-08 核验）：
 from __future__ import annotations
 
 import json
-import os
 import sys
 from pathlib import Path
 

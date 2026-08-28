@@ -54,7 +54,7 @@ def ensure_cache(plot_id: str) -> Path:
                 X = Y = None
                 mesh_file = panel.get("mesh_file")
                 if mesh_file and Path(mesh_file).exists():
-                    from .plotters import _mesh_geometry, _field_grid
+                    from .plotters import _field_grid, _mesh_geometry
                     verts, geo = _mesh_geometry(mesh_file)
                     X, Y, _ = _field_grid(verts, geo)
                     try:

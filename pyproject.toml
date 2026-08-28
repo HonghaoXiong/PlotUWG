@@ -1,0 +1,30 @@
+# PlotUWG (h5plot_studio) 项目配置 — 非安装型项目，此文件只放工具配置
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+extend-exclude = [
+    "build",
+    "dist",
+    "demo_output",
+    "userdata",
+    "rust_bin",
+]
+
+[tool.ruff.lint]
+# E4/E7/E9: 真错误级 pycodestyle；F: pyflakes；I: import 排序；
+# B: bugbear 常见陷阱；UP: 可现代化写法提示
+select = ["E4", "E7", "E9", "F", "I", "B", "UP"]
+ignore = [
+    "E741",  # l/O 作变量名在科学代码中常见
+    "E742",
+    "E743",
+    "E701",  # 本代码库故意的紧凑单行 if/elif 风格，不作为告警
+    "E702",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# selftest.py 有意分步导入（每个测试节开始时才 import，便于阅读输出）
+"selftest.py" = ["E402"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["core", "app", "server"]
